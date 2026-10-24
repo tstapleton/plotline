@@ -22,8 +22,10 @@ export interface Cast {
  * drawn as a box. The UI always comes first, after the user.
  */
 export function castOf(ui: string, participants: Participant[], events: TraceEvent[], decorate: (name: string) => string = (n) => n): Cast {
-  const seen: string[] = [ui];
+  const seen: string[] = [];
   const add = (name: string) => !seen.includes(name) && seen.push(name);
+  // The generic UI comes first when it's used; with components it often isn't.
+  if (events.some((e) => (e.kind === 'user' ? e.to : e.kind === 'note' ? e.over : `${e.from}\n${e.to}`).split('\n').includes(ui))) add(ui);
   for (const e of events) {
     if (e.kind === 'note') add(e.over);
     else if (e.kind !== 'user') {

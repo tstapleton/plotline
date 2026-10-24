@@ -5,6 +5,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { isObservable, Observable } from 'rxjs';
 import { TraceSink } from '../store/with-tracing';
 import { Participant, TraceEvent } from '../core/model';
+import { classesOnStack, renderedComponents } from './components';
 import { diffState, summarize, summarizeArgs } from './summarize';
 
 export interface ParticipantOptions {
@@ -27,6 +28,10 @@ export class Tracer implements TraceSink {
   featureGroup: string | undefined;
   events: TraceEvent[] = [];
   private readonly groups = new Map<string, string | undefined>();
+  /** Components seen rendered during the current test. */
+  private readonly components = new Set<string>();
+  /** Placeholder participants awaiting a component, with the classes on their stack. */
+  private readonly pending = new Map<string, string[]>();
   private recording = false;
   private readonly context = new AsyncLocalStorage<string>();
 
@@ -35,11 +40,26 @@ export class Tracer implements TraceSink {
     this.uiName = 'UI';
     this.featureGroup = undefined;
     this.groups.clear();
+    this.components.clear();
+    this.pending.clear();
     this.recording = true;
   }
 
   stop(): TraceEvent[] {
     this.recording = false;
+    for (const name of renderedComponents()) this.components.add(name);
+    const resolved = new Map<string, string>();
+    for (const [placeholder, classes] of this.pending) {
+      const component = classes.find((c) => this.components.has(c));
+      if (component) this.addComponent(component);
+      resolved.set(placeholder, component ?? this.uiName);
+    }
+    const name = (n: string) => resolved.get(n) ?? n;
+    this.events = this.events.map((e) => {
+      if (e.kind === 'note') return { ...e, over: name(e.over) };
+      if (e.kind === 'user') return { ...e, to: name(e.to) };
+      return { ...e, from: name(e.from), to: name(e.to) };
+    });
     return this.events;
   }
 
@@ -50,6 +70,37 @@ export class Tracer implements TraceSink {
 
   get caller(): string {
     return this.context.getStore() ?? this.uiName;
+  }
+
+  /**
+   * The current participant or, when that's the UI, the component on the call stack. A
+   * component still being constructed (say, creating its store) isn't on the page yet,
+   * so the call gets a placeholder that `stop()` resolves once the test has rendered it.
+   */
+  callerOrComponent(): string {
+    const caller = this.caller;
+    if (caller !== this.uiName) return caller;
+    const classes = classesOnStack();
+    if (!classes.length) return caller;
+    for (const name of renderedComponents()) this.components.add(name);
+    const known = classes.find((c) => this.components.has(c));
+    if (known) {
+      this.addComponent(known);
+      return known;
+    }
+    const placeholder = `\u0000component-${this.pending.size}`;
+    this.pending.set(placeholder, classes);
+    return placeholder;
+  }
+
+  /** Notes which components are on the page now, to resolve placeholders later. */
+  observeComponents(): void {
+    if (this.recording && this.pending.size) for (const name of renderedComponents()) this.components.add(name);
+  }
+
+  /** Registers a component as a participant, in the same box as the UI. */
+  addComponent(name: string): void {
+    if (!this.groups.has(name)) this.groups.set(name, this.featureGroup);
   }
 
   runAs<T>(participant: string, fn: () => T): T {
@@ -117,7 +168,7 @@ export class Tracer implements TraceSink {
   ): (...args: unknown[]) => unknown {
     const tracer = this;
     const wrapped = function (...args: unknown[]) {
-      const from = tracer.caller;
+      const from = tracer.callerOrComponent();
       // Calls inside a participant stay off the diagram; it shows boundaries only.
       if (from === name) return fn.apply(thisArg, args);
 

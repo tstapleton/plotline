@@ -66,7 +66,9 @@ function attributeChangeDetectionToUi(): () => void {
   const tickName = typeof appRef['_tick'] === 'function' ? '_tick' : 'tick';
   const tick = appRef[tickName]!;
   appRef[tickName] = function (this: unknown, ...args: unknown[]) {
-    return tracer.runAs(tracer.uiName, () => tick.apply(this, args));
+    const result = tracer.runAs(tracer.uiName, () => tick.apply(this, args));
+    tracer.observeComponents();
+    return result;
   };
   return () => {
     appRef[tickName] = tick;
