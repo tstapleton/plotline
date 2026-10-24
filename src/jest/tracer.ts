@@ -72,7 +72,7 @@ export class Tracer implements TraceSink {
   }
 
   get caller(): string {
-    return this.context.getStore() ?? this.uiName;
+    return zoneParticipant() ?? this.context.getStore() ?? this.uiName;
   }
 
   /**
@@ -116,8 +116,16 @@ export class Tracer implements TraceSink {
     if (!this.groups.has(name)) this.groups.set(name, this.featureGroup);
   }
 
+  /**
+   * Runs `fn` as `participant`, so whatever it starts is attributed to it. Node's
+   * AsyncLocalStorage follows native promises, timers and await; with zone.js loaded,
+   * the participant is also kept in a Zone, which zone.js carries through its own
+   * promises (whose callbacks it batches, losing Node's context).
+   */
   runAs<T>(participant: string, fn: () => T): T {
-    return participant === this.uiName ? this.context.exit(fn) : this.context.run(participant, fn);
+    const run = () => (participant === this.uiName ? this.context.exit(fn) : this.context.run(participant, fn));
+    const zone = currentZone();
+    return zone ? zone.fork({ name: 'plotline', properties: { [ZONE_KEY]: participant } }).run(run) : run();
   }
 
   record(event: TraceEvent): void {
@@ -219,7 +227,9 @@ export class Tracer implements TraceSink {
         ),
       );
     }
-    if (result instanceof Promise) {
+    // Any thenable: with zone.js, `Promise` is ZoneAwarePromise while async functions
+    // may still return native promises.
+    if (isThenable(result)) {
       return result.then(
         (value) => {
           // A store action that resolves with nothing has said everything in its state
@@ -239,6 +249,27 @@ export class Tracer implements TraceSink {
     }
     return result;
   }
+}
+
+const ZONE_KEY = 'plotlineParticipant';
+
+interface ZoneLike {
+  get(key: string): unknown;
+  fork(spec: { name: string; properties: Record<string, unknown> }): { run<T>(fn: () => T): T };
+}
+
+function currentZone(): ZoneLike | undefined {
+  return (globalThis as { Zone?: { current: ZoneLike } }).Zone?.current;
+}
+
+/** The participant zone.js carried here, if zone.js is loaded and one was set. */
+function zoneParticipant(): string | undefined {
+  const value = currentZone()?.get(ZONE_KEY);
+  return typeof value === 'string' ? value : undefined;
+}
+
+function isThenable(value: unknown): value is PromiseLike<unknown> {
+  return typeof value === 'object' && value !== null && typeof (value as PromiseLike<unknown>).then === 'function';
 }
 
 function isRxMethodRef(value: unknown): boolean {

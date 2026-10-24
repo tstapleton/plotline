@@ -1,4 +1,5 @@
 import { ApplicationRef, OutputEmitterRef } from '@angular/core';
+import { ComponentFixture } from '@angular/core/testing';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { basename, join, relative, resolve } from 'node:path';
 import { recordUserEvents } from './dom-recorder';
@@ -64,21 +65,27 @@ export function recordPlotline(): void {
 }
 
 /**
- * Change detection belongs to the UI, whichever participant scheduled it. Patches
- * ApplicationRef while this file's tests run, and returns a function that undoes it.
+ * Change detection belongs to the UI, whichever participant scheduled it: through
+ * ApplicationRef (the app, zoneless tests) or a test fixture (Testing Library, zone.js
+ * tests). Patches both while this file's tests run, and returns a function that undoes it.
  */
 function attributeChangeDetectionToUi(): () => void {
   const appRef = ApplicationRef.prototype as unknown as Record<string, (...args: unknown[]) => unknown>;
-  const tickName = typeof appRef['_tick'] === 'function' ? '_tick' : 'tick';
-  const tick = appRef[tickName]!;
-  appRef[tickName] = function (this: unknown, ...args: unknown[]) {
-    const result = tracer.runAs(tracer.uiName, () => tick.apply(this, args));
-    tracer.observeComponents();
-    return result;
-  };
-  return () => {
-    appRef[tickName] = tick;
-  };
+  const fixture = ComponentFixture.prototype as unknown as Record<string, (...args: unknown[]) => unknown>;
+  const targets: [Record<string, (...args: unknown[]) => unknown>, string][] = [
+    [appRef, typeof appRef['_tick'] === 'function' ? '_tick' : 'tick'],
+    [fixture, 'detectChanges'],
+  ];
+  const originals = targets.map(([target, name]) => {
+    const original = target[name]!;
+    target[name] = function (this: unknown, ...args: unknown[]) {
+      const result = tracer.runAs(tracer.uiName, () => original.apply(this, args));
+      tracer.observeComponents();
+      return result;
+    };
+    return original;
+  });
+  return () => targets.forEach(([target, name], i) => (target[name] = originals[i]!));
 }
 
 /**

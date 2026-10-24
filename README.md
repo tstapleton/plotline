@@ -193,6 +193,20 @@ either side of a change are collapsed.
   `User ->> Component` messages, named by the control's label. Repeated keystrokes on one field
   are merged into one step.
 
+## zone.js and zoneless apps
+
+plotline works with both. It follows async work with Node's `AsyncLocalStorage`, and
+when zone.js is loaded it also keeps the current participant in a Zone, which zone.js
+carries through its own promises, timers and `fakeAsync`'s `tick()`. Change detection,
+whether run by `ApplicationRef` or a test fixture, is attributed to the UI.
+
+For zone.js apps, compile specs with `"target": "ES2016"` (or lower) in the spec
+tsconfig, as jest-preset-angular recommends and the Angular CLI does for zone apps.
+zone.js can't follow native `async`/`await`, and neither can your tests' change
+detection. Also create rejected promises in mocks lazily
+(`mockImplementation(() => Promise.reject(…))`). An eagerly rejected promise counts as
+unhandled under zone.js.
+
 ## Known limits
 
 - Tests must record the same thing every run. Random ids, real timestamps and
