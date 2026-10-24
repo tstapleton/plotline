@@ -9,7 +9,7 @@ changed, and draws each test as a sequence diagram. On a pull request it does th
 for the base branch and posts a highlighted diff, so reviewers see how the feature's
 behaviour changed, not just its code.
 
-See it on the pull requests of [tstapleton/kitchen](https://github.com/tstapleton/kitchen), a recipe and grocery list app.
+See it on the pull requests of [tstapleton/birdseed](https://github.com/tstapleton/birdseed), a recipe, meal plan and grocery list app.
 
 ## Install
 
