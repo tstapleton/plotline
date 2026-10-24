@@ -1,7 +1,8 @@
 import { toSequenceDiagram } from '../core/mermaid';
 import { TestDiff } from './align';
 import { DIFF_MARKS, toDiffDiagram } from './mermaid';
-import { changeLines, countsText, reviewOrder, statusLabel, summarizeRun } from './summary';
+import { describeTest, groupChanges } from './describe';
+import { countsText, reviewOrder, statusLabel, summarizeRun } from './summary';
 
 /** GitHub caps comments at 65,536 characters; leave room for the footer. */
 const COMMENT_LIMIT = 60_000;
@@ -36,6 +37,7 @@ export function diffComment(diffs: TestDiff[], labels: DiffLabels): string {
     '',
     `<sub>Each diagram is one integration test, recorded on both sides. ${DIFF_MARKS.added} added · ${DIFF_MARKS.removed} removed · ${DIFF_MARKS.changed} changed · ${DIFF_MARKS.moved} moved. Unchanged stretches are collapsed.</sub>`,
     '',
+    ...whatChanged(diffs),
     ...(changed.length
       ? [
           '| Test | | Steps | Participants |',
@@ -70,14 +72,17 @@ function section(d: TestDiff): string {
 
   // A brand new or deleted test reads better as a plain diagram than as all + or all −.
   const diagram = d.status === 'added' ? toSequenceDiagram(d.head!) : d.status === 'removed' ? toSequenceDiagram(d.base!) : toDiffDiagram(d);
-  const lines = d.status === 'changed' ? changeLines(d) : [];
-  const shown = lines.slice(0, 20);
+  const changes = describeTest(d);
+  const shown = changes.slice(0, 8);
 
   return [
     `### ${title}: ${d.test}`,
     '',
     meta.join(' · '),
     '',
+    ...(changes.length
+      ? [...shown.map((c) => `- ${DIFF_MARKS[c.op]} ${c.text}`), ...(changes.length > shown.length ? [`- … and ${changes.length - shown.length} more in the diagram`] : []), '']
+      : []),
     `<details${d.status === 'changed' ? ' open' : ''}><summary>Sequence ${d.status === 'changed' ? 'diff' : 'diagram'}</summary>`,
     '',
     '```mermaid',
@@ -86,18 +91,21 @@ function section(d: TestDiff): string {
     '',
     '</details>',
     '',
-    ...(lines.length
-      ? [
-          '<details><summary>Changes as text</summary>',
-          '',
-          ...shown.map((l) => `- ${DIFF_MARKS[l.op]} ${l.who}: \`${code(l.what)}\`${l.was ? ` (was \`${code(l.was)}\`)` : ''}`),
-          ...(lines.length > shown.length ? [`- … and ${lines.length - shown.length} more`] : []),
-          '',
-          '</details>',
-          '',
-        ]
-      : []),
   ].join('\n');
+}
+
+/** The same change across tests, as one list at the top. */
+function whatChanged(diffs: TestDiff[]): string[] {
+  const groups = groupChanges(diffs);
+  if (!groups.length) return [];
+  const shown = groups.slice(0, 12);
+  return [
+    '#### What changed',
+    '',
+    ...shown.map(({ change, tests }) => `- ${DIFF_MARKS[change.op]} ${change.text}${tests.length > 1 ? ` · in ${tests.length} tests` : ` · in “${tests[0]!.test}”`}`),
+    ...(groups.length > shown.length ? [`- … and ${groups.length - shown.length} more`] : []),
+    '',
+  ];
 }
 
 function participantsText(d: TestDiff): string {
@@ -109,6 +117,3 @@ function cell(text: string): string {
   return text.replace(/\|/g, '\\|');
 }
 
-function code(text: string): string {
-  return text.replace(/`/g, "'");
-}

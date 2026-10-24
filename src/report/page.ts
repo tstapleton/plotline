@@ -84,7 +84,13 @@ ul.tests { list-style: none; padding: 0; }
 ul.tests li { margin: 4px 0; }
 .counts { color: var(--muted); font-size: 13px; margin-left: 4px; }
 section.test h2 .badge { margin-right: 8px; }
-ul.changes { margin: 0; padding: 4px 20px 16px; list-style: none; font-size: 13px; }
+ul.changes { margin: 0; padding: 12px 20px; list-style: none; font-size: 14px; border-bottom: 1px solid var(--border); }
+.summary { margin: 24px 0; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+.where { display: inline-block; margin-left: 6px; border: 0; color: var(--muted); font-size: 13px; }
+.where > summary { padding: 0; display: inline; }
+.where ul { margin: 4px 0 2px; padding-left: 18px; }
+.summary h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 16px 20px 0; }
+.summary ul.changes { border-bottom: 0; }
 ul.changes li { padding: 3px 0; overflow-wrap: anywhere; }
 ul.changes .mark { display: inline-block; width: 18px; font-weight: 700; }
 ul.changes .added .mark { color: var(--added); }

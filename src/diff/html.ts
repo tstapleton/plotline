@@ -3,7 +3,8 @@ import { html, page, slug, svgOf } from '../report/page';
 import { TestDiff } from './align';
 import { DiffLabels } from './markdown';
 import { DIFF_MARKS, toDiffDiagram } from './mermaid';
-import { changeLines, countsText, reviewOrder, statusLabel, summarizeRun } from './summary';
+import { describeTest, groupChanges } from './describe';
+import { countsText, reviewOrder, statusLabel, summarizeRun } from './summary';
 
 /** The full review page: every changed test's diff, plus before and after diagrams. */
 export function diffPage(diffs: TestDiff[], labels: DiffLabels): string {
@@ -32,6 +33,7 @@ export function diffPage(diffs: TestDiff[], labels: DiffLabels): string {
   <span><i style="background:var(--moved-bg)"></i>${DIFF_MARKS.moved} moved</span>
   <span>Unchanged stretches are collapsed; open “Before and after” for the full runs.</span>
 </div>
+${whatChanged(ordered)}
 <nav><h2>Tests</h2><ul class="tests">${toc}</ul></nav>
 ${ordered.map(section).join('\n')}
 </main>`,
@@ -56,12 +58,12 @@ function section(d: TestDiff): string {
     return `<section class="test" id="${slug(d.test)}">${head}<div class="diagram">${svgOf(toSequenceDiagram(trace))}</div></section>`;
   }
 
-  const lines = changeLines(d)
-    .map((l) => `<li class="${l.op}"><span class="mark">${DIFF_MARKS[l.op]}</span><span class="who">${html(l.who)}</span> <code>${html(l.what)}</code>${l.was ? ` <span class="was">was <code>${html(l.was)}</code></span>` : ''}</li>`)
+  const lines = describeTest(d)
+    .map((c) => `<li class="${c.op}"><span class="mark">${DIFF_MARKS[c.op]}</span>${inline(c.text)}</li>`)
     .join('\n');
   return `<section class="test" id="${slug(d.test)}">${head}
+  <ul class="changes">${lines}</ul>
   <div class="diagram">${svgOf(toDiffDiagram(d))}</div>
-  <details><summary>Changes as text</summary><ul class="changes">${lines}</ul></details>
   <details><summary>Before and after</summary>
     <div class="sides">
       <div><h3>Before</h3><div class="diagram">${svgOf(toSequenceDiagram(d.base!))}</div></div>
@@ -69,6 +71,26 @@ function section(d: TestDiff): string {
     </div>
   </details>
 </section>`;
+}
+
+function whatChanged(diffs: TestDiff[]): string {
+  const groups = groupChanges(diffs);
+  if (!groups.length) return '';
+  const items = groups
+    .map(({ change, tests }) => {
+      const links = tests.map((t) => `<li><a href="#${slug(t.test)}">${html(t.test)}</a></li>`).join('');
+      return `<li class="${change.op}"><span class="mark">${DIFF_MARKS[change.op]}</span>${inline(change.text)}
+        <details class="where"><summary>${tests.length === 1 ? '1 test' : `${tests.length} tests`}</summary><ul>${links}</ul></details></li>`;
+    })
+    .join('\n');
+  return `<section class="summary"><h2>What changed</h2><ul class="changes">${items}</ul></section>`;
+}
+
+/** The Markdown subset change sentences use: **bold** and `code`. */
+function inline(text: string): string {
+  return html(text)
+    .replace(/`([^`]*)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
 }
 
 function badgeClass(status: string): string {

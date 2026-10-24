@@ -1,5 +1,4 @@
-import { describeChange, TraceEvent } from '../core/model';
-import { DiffOp, TestDiff, TestStatus, textOf } from './align';
+import { TestDiff, TestStatus } from './align';
 import { DIFF_MARKS } from './mermaid';
 
 export interface RunSummary {
@@ -37,40 +36,4 @@ export function countsText(d: TestDiff): string {
 export function statusLabel(d: TestDiff): string {
   if (d.renamedFrom) return 'renamed';
   return d.status;
-}
-
-export interface ChangeLine {
-  op: Exclude<DiffOp['op'], 'same'>;
-  who: string;
-  what: string;
-  was?: string;
-}
-
-/** The test's changes as sentences, for people who'd rather read than look. */
-export function changeLines(d: TestDiff): ChangeLine[] {
-  const lines: ChangeLine[] = [];
-  for (const o of d.ops) {
-    if (o.op === 'same') continue;
-    lines.push({ op: o.op, who: whoOf(o.event), what: whatOf(o.event), ...(o.op === 'changed' ? { was: whatOf(o.before) } : {}) });
-  }
-  return lines;
-}
-
-function whoOf(e: TraceEvent): string {
-  switch (e.kind) {
-    case 'user':
-      return `User → ${e.to}`;
-    case 'note':
-      return `${e.over} state`;
-    case 'return':
-      return `${e.from} ⇠ ${e.to}`;
-    case 'throw':
-      return `${e.from} ✕ ${e.to}`;
-    default:
-      return `${e.from} → ${e.to}`;
-  }
-}
-
-function whatOf(e: TraceEvent): string {
-  return e.kind === 'note' ? e.changes.map(describeChange).join(', ') : textOf(e);
 }
