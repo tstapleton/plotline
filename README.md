@@ -84,12 +84,15 @@ unaffected. On CI, point the action's `test-command` at just your feature's test
 ## Use it locally
 
 ```bash
-PLOTLINE=1 npx jest                       # plotline/<spec>/<test>.json and .md (Mermaid)
+PLOTLINE=1 npx jest src/app/features/recipes        # plotline/<spec>/<test>.json and .md (Mermaid)
 npx plotline report plotline --out plotline/report   # one HTML page, rendered with Pele
-npx plotline diff <base-dir> <head-dir> --out plotline-diff
+npx plotline diff <base-dir> <head-dir> --out plotline-diff [--again <head-dir-2>]
+npx plotline stable <run-dir> <run-dir>              # exit 1 if any test recorded differently
 ```
 
 `PLOTLINE_DIR` changes where traces are written, so two runs can sit side by side.
+Running your tests twice into different directories and then `plotline stable` is the
+quickest way to find test doubles that use random ids or the real clock.
 
 ## Use it on pull requests
 
@@ -128,13 +131,27 @@ as an artifact, then posts a comment, or updates its earlier one.
 | `install-command` | `npm ci --no-audit --no-fund` | Runs in both checkouts |
 | `install-head` | `true` | `false` if the workflow already installed the PR checkout |
 | `test-command` | `npx jest` | Runs with `PLOTLINE=1` and `PLOTLINE_DIR` set |
+| `check-stability` | `true` | Run the PR's tests twice and flag tests that record differently |
 | `base-ref` | the PR's base commit | |
 | `comment` | `true` | Post the PR comment |
 
-The repository using the action needs read access to the package; see
-[Releasing](#releasing).
+A public package can be installed with any workflow's own token, so nothing else needs
+setting up.
 
 ## Reading a diff
+
+The comment starts with **What changed**: each change in words, such as
+"**Meal plan store** now calls **Grocery API** `lists()`". A change that shows up in
+several tests is listed once, with how many tests show it, and calls rank above state
+changes and reordering. Each changed test then lists its own changes and shows its diff
+diagram.
+
+If the stability check found tests that record differently on two runs of the same
+code, a warning comes first, with an example of what differed for each.
+
+Diagrams number each user action ①, ②, … with the steps before the first under
+"Setup". In a diff, an action whose steps didn't change collapses to one line naming
+it.
 
 Tests are paired by spec file and name. A test that exists on only one side counts as
 **renamed** when at least 60% of its steps match a test on the other side.
@@ -147,8 +164,8 @@ Tests are paired by spec file and name. A test that exists on only one side coun
 | `↕` | moved: the same message at a different point within the same user action |
 
 New participants are labelled `(new)`, and ones no longer called are labelled
-`(removed)`. Unchanged stretches longer than two steps either side of a change are
-collapsed.
+`(removed)`. Within a changed user action, unchanged stretches longer than two steps
+either side of a change are collapsed.
 
 ## How recording works
 
@@ -158,21 +175,28 @@ collapsed.
   the resolved value does.
 - **Who is calling.** The current participant is kept in Node's `AsyncLocalStorage`.
   Work that continues after a timer, an observable emission or an `await` is still
-  attributed correctly. Code outside any participant (DOM handlers, change detection) is
-  the UI. Calls a participant makes to itself are left out, so the diagram shows
-  boundaries only.
+  attributed correctly. Calls a participant makes to itself are left out, so the diagram
+  shows boundaries only.
+- **Components.** A call made from a component (its template, a lifecycle hook or a
+  method) is drawn from that component, e.g. `RecipeDetailPage ->> Recipe store`. User
+  actions go to the component whose template holds the element. This uses the debugging
+  helpers Angular publishes in development mode, which TestBed runs in. Anything plotline
+  can't place, such as change detection, is the generic UI.
 - **State.** `watchState` turns each `patchState` into a note of what changed
   (`status: "loading" → "ready"`). Lists of entities are compared by id
   (`recipes[r-1].favorite: false → true`).
 - **User.** Capture-phase DOM listeners turn input, change and click events into
-  `User ->> UI` messages, named by the control's label. Repeated keystrokes on one field
+  `User ->> Component` messages, named by the control's label. Repeated keystrokes on one field
   are merged into one step.
 
 ## Known limits
 
 - Tests must record the same thing every run. Random ids, real timestamps and
   `Date.now()` in your test doubles show up as changes on every PR. Give mocks
-  predictable ids and a fixed clock.
+  predictable ids and a fixed clock; the stability check points these out.
+- A component's output (`@Output`/`output()`) isn't drawn as its own message: a click in
+  a child component shows as the user acting on the child, then the parent calling the
+  store.
 - A diagram shows one run, the path this test took. It is not every possible path.
 - `withTracing` must come after the features it should cover and before `withHooks`.
 - Computeds the store doesn't expose are evaluated in their reader's context. Calls they
@@ -188,9 +212,7 @@ collapsed.
 
 Every merge to `main` publishes the next patch version to GitHub Packages, tags it
 `vX.Y.Z`, and moves the `v0` tag that workflows use. It needs no secrets beyond the
-workflow's own token. To let another repository's workflows install the package, open
-the package's settings on GitHub (**Packages → plotline → Package settings → Manage
-Actions access**) and add that repository with the **Read** role.
+workflow's own token.
 
 ## Develop
 
