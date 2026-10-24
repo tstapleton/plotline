@@ -28,6 +28,8 @@ export class Tracer implements TraceSink {
   featureGroup: string | undefined;
   events: TraceEvent[] = [];
   private readonly groups = new Map<string, string | undefined>();
+  /** Participants that are stores, whose async actions report back with their state. */
+  private readonly stores = new Set<string>();
   /** Components seen rendered during the current test. */
   private readonly components = new Set<string>();
   /** Placeholder participants awaiting a component, with the classes on their stack. */
@@ -40,6 +42,7 @@ export class Tracer implements TraceSink {
     this.uiName = 'UI';
     this.featureGroup = undefined;
     this.groups.clear();
+    this.stores.clear();
     this.components.clear();
     this.pending.clear();
     this.recording = true;
@@ -129,6 +132,7 @@ export class Tracer implements TraceSink {
   /** Called by `withTracing()` while a SignalStore is being constructed. */
   instrumentStore<T extends object>(name: string, innerStore: T): T {
     this.groups.set(name, this.featureGroup);
+    this.stores.add(name);
     const inner = innerStore as T & {
       methods: Record<string, (...args: unknown[]) => unknown>;
       props: Record<string, unknown>;
@@ -208,7 +212,10 @@ export class Tracer implements TraceSink {
     if (result instanceof Promise) {
       return result.then(
         (value) => {
-          this.record({ kind: 'return', from: name, to: from, label: summarize(value) });
+          // A store action that resolves with nothing has said everything in its state
+          // notes; a service call that does is reported as done.
+          if (value !== undefined) this.record({ kind: 'return', from: name, to: from, label: summarize(value) });
+          else if (!this.stores.has(name)) this.record({ kind: 'return', from: name, to: from, label: 'done' });
           return value;
         },
         (error) => {
