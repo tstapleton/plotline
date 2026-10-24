@@ -1,6 +1,6 @@
 import { isSignal } from '@angular/core';
-import { isObservable } from 'rxjs';
 import { StateChange } from '../core/model';
+import { isObservable } from './observable';
 
 /** One-line, size-capped description of a value for a diagram label. */
 export function summarize(value: unknown, depth = 0, budget = 45): string {

@@ -51,3 +51,13 @@ describe('findUnstable', () => {
     assert.match(unstable[0]!.example, /g-1a/);
   });
 });
+
+describe('observables', () => {
+  it('recognises RxJS values without importing RxJS, including subjects', async () => {
+    const { isObservable } = await import('../src/jest/observable');
+    const { BehaviorSubject, of } = await import('rxjs');
+    assert.equal(isObservable(of(1)), true);
+    assert.equal(isObservable(new BehaviorSubject(1)), true);
+    assert.equal(isObservable(Promise.resolve(1)), false);
+  });
+});

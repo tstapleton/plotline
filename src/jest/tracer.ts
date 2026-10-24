@@ -2,10 +2,10 @@ import { isSignal } from '@angular/core';
 import { SIGNAL } from '@angular/core/primitives/signals';
 import { getState, StateSource, watchState } from '@ngrx/signals';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { isObservable, Observable } from 'rxjs';
 import { TraceSink } from '../store/with-tracing';
 import { Participant, TraceEvent } from '../core/model';
 import { classesOnStack, renderedComponents } from './components';
+import { baseObservable, isObservable } from './observable';
 import { diffState, summarize, summarizeArgs } from './summarize';
 
 export interface ParticipantOptions {
@@ -189,14 +189,14 @@ export class Tracer implements TraceSink {
   private traceResult(name: string, from: string, result: unknown): unknown {
     if (isObservable(result)) {
       // Emissions are the "response"; subscribers run as the caller again.
-      return new Observable((subscriber) =>
+      return new (baseObservable(result))((subscriber) =>
         this.runAs(name, () =>
           result.subscribe({
-            next: (value) => {
+            next: (value: unknown) => {
               this.record({ kind: 'return', from: name, to: from, label: summarize(value) });
               this.runAs(from, () => subscriber.next(value));
             },
-            error: (error) => {
+            error: (error: unknown) => {
               this.record({ kind: 'throw', from: name, to: from, label: summarize(error) });
               this.runAs(from, () => subscriber.error(error));
             },
