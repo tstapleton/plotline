@@ -4,10 +4,11 @@ import { TestDiff } from './align';
 import { DiffLabels } from './markdown';
 import { DIFF_MARKS, toDiffDiagram } from './mermaid';
 import { describeTest, groupChanges } from './describe';
+import { Unstable } from './stability';
 import { countsText, reviewOrder, statusLabel, summarizeRun } from './summary';
 
 /** The full review page: every changed test's diff, plus before and after diagrams. */
-export function diffPage(diffs: TestDiff[], labels: DiffLabels): string {
+export function diffPage(diffs: TestDiff[], labels: DiffLabels, unstable: Unstable[] = []): string {
   const summary = summarizeRun(diffs);
   const ordered = reviewOrder(diffs);
   const title = `Behaviour diff: ${labels.base} → ${labels.head}`;
@@ -33,7 +34,8 @@ export function diffPage(diffs: TestDiff[], labels: DiffLabels): string {
   <span><i style="background:var(--moved-bg)"></i>${DIFF_MARKS.moved} moved</span>
   <span>Unchanged stretches are collapsed; open “Before and after” for the full runs.</span>
 </div>
-${whatChanged(ordered)}
+${unstableWarning(unstable)}
+${whatChanged(ordered.filter((d) => !unstable.some((u) => u.key === d.key)))}
 <nav><h2>Tests</h2><ul class="tests">${toc}</ul></nav>
 ${ordered.map(section).join('\n')}
 </main>`,
@@ -71,6 +73,14 @@ function section(d: TestDiff): string {
     </div>
   </details>
 </section>`;
+}
+
+function unstableWarning(unstable: Unstable[]): string {
+  if (!unstable.length) return '';
+  const items = unstable.map((u) => `<li><a href="#${slug(u.test)}">${html(u.test)}</a>: ${inline(u.example)}</li>`).join('');
+  return `<section class="summary unstable"><h2>Recorded differently on two runs</h2>
+  <p>These tests changed between two runs of the same code, so their diffs may show changes this PR didn't make. The usual causes are random ids, real timestamps or async work the test doesn't wait for.</p>
+  <ul class="changes">${items}</ul></section>`;
 }
 
 function whatChanged(diffs: TestDiff[]): string {

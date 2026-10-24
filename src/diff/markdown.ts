@@ -2,6 +2,7 @@ import { toSequenceDiagram } from '../core/mermaid';
 import { TestDiff } from './align';
 import { DIFF_MARKS, toDiffDiagram } from './mermaid';
 import { describeTest, groupChanges } from './describe';
+import { Unstable } from './stability';
 import { countsText, reviewOrder, statusLabel, summarizeRun } from './summary';
 
 /** GitHub caps comments at 65,536 characters; leave room for the footer. */
@@ -18,7 +19,7 @@ export interface DiffLabels {
  * A pull-request comment: a summary table, then for each changed test a Mermaid diff
  * diagram (GitHub renders these) and the same changes as text.
  */
-export function diffComment(diffs: TestDiff[], labels: DiffLabels): string {
+export function diffComment(diffs: TestDiff[], labels: DiffLabels, unstable: Unstable[] = []): string {
   const summary = summarizeRun(diffs);
   const ordered = reviewOrder(diffs);
   const changed = ordered.filter((d) => d.status !== 'unchanged');
@@ -37,7 +38,8 @@ export function diffComment(diffs: TestDiff[], labels: DiffLabels): string {
     '',
     `<sub>Each diagram is one integration test, recorded on both sides. ${DIFF_MARKS.added} added · ${DIFF_MARKS.removed} removed · ${DIFF_MARKS.changed} changed · ${DIFF_MARKS.moved} moved. Unchanged stretches are collapsed.</sub>`,
     '',
-    ...whatChanged(diffs),
+    ...unstableWarning(unstable),
+    ...whatChanged(diffs.filter((d) => !unstable.some((u) => u.key === d.key))),
     ...(changed.length
       ? [
           '| Test | | Steps | Participants |',
@@ -92,6 +94,17 @@ function section(d: TestDiff): string {
     '</details>',
     '',
   ].join('\n');
+}
+
+function unstableWarning(unstable: Unstable[]): string[] {
+  if (!unstable.length) return [];
+  return [
+    `> [!WARNING]`,
+    `> ${unstable.length === 1 ? '1 test' : `${unstable.length} tests`} recorded differently on two runs of the same code, so ${unstable.length === 1 ? 'its' : 'their'} diffs below may show changes this PR didn't make. The usual causes are random ids, real timestamps or async work the test doesn't wait for.`,
+    '>',
+    ...unstable.slice(0, 10).map((u) => `> - ${u.test}: ${u.example}`),
+    '',
+  ];
 }
 
 /** The same change across tests, as one list at the top. */

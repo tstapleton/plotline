@@ -17,6 +17,9 @@ inputs:
   test-command:
     description: Runs the integration tests. plotline sets PLOTLINE=1 and PLOTLINE_DIR around it.
     default: npx jest
+  check-stability:
+    description: Run the PR's tests twice and flag tests that record differently on the same code (random ids, timestamps…).
+    default: "true"
   base-ref:
     description: Commit to compare against. Defaults to the pull request's base commit.
     default: ${{ github.event.pull_request.base.sha }}
@@ -70,13 +73,16 @@ runs:
       env:
         INSTALL: ${{ inputs.install-command }}
         INSTALL_HEAD: ${{ inputs.install-head }}
+        CHECK_STABILITY: ${{ inputs.check-stability }}
         TEST: ${{ inputs.test-command }}
         PLOTLINE: "1"
-        PLOTLINE_DIR: ${{ runner.temp }}/plotline/traces-head
+        TRACES: ${{ runner.temp }}/plotline
       run: |
-        mkdir -p "$PLOTLINE_DIR"
         if [ "$INSTALL_HEAD" = "true" ]; then eval "$INSTALL"; fi
-        eval "$TEST"
+        PLOTLINE_DIR="$TRACES/traces-head" eval "$TEST"
+        if [ "$CHECK_STABILITY" = "true" ]; then
+          PLOTLINE_DIR="$TRACES/traces-head-again" eval "$TEST"
+        fi
 
     - name: Diff the diagrams
       id: diff
@@ -87,7 +93,9 @@ runs:
         BASE_LABEL: ${{ github.event.pull_request.base.ref || inputs.base-ref }}
         HEAD_LABEL: ${{ github.event.pull_request.head.ref || github.ref_name }}
       run: |
-        npx --no-install plotline diff "$TRACES/traces-base" "$TRACES/traces-head" \
+        again=()
+        if [ -d "$TRACES/traces-head-again" ]; then again=(--again "$TRACES/traces-head-again"); fi
+        npx --no-install plotline diff "$TRACES/traces-base" "$TRACES/traces-head" "${again[@]}" \
           --out "$TRACES/diff" --base-label "$BASE_LABEL" --head-label "$HEAD_LABEL" | tee "$TRACES/summary.txt"
         echo "changed=$(grep -oE '^[0-9]+' "$TRACES/summary.txt" | head -1)" >> "$GITHUB_OUTPUT"
         # Artifacts are named after the file when not archived, so give it a unique name.
@@ -116,7 +124,9 @@ runs:
       # Regenerate the comment now that the report has a link, then update the
       # previous plotline comment rather than adding a new one per push.
       run: |
-        npx --no-install plotline diff "$TRACES/traces-base" "$TRACES/traces-head" \
+        again=()
+        if [ -d "$TRACES/traces-head-again" ]; then again=(--again "$TRACES/traces-head-again"); fi
+        npx --no-install plotline diff "$TRACES/traces-base" "$TRACES/traces-head" "${again[@]}" \
           --out "$TRACES/comment" --base-label "$BASE_LABEL" --head-label "$HEAD_LABEL" --report-url "$REPORT_URL" > /dev/null
         marker='<!-- plotline -->'
         { echo "$marker"; cat "$TRACES/comment/comment.md"; } > "$TRACES/comment/body.md"

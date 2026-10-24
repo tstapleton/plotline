@@ -41,3 +41,13 @@ describe('groupChanges', () => {
     assert.deepEqual(group!.tests.map((t) => t.test), ['a', 'b']);
   });
 });
+
+describe('findUnstable', () => {
+  it('flags tests that recorded differently on two runs of the same code', async () => {
+    const { findUnstable } = await import('../src/diff/stability');
+    const run = (id: string) => [trace('creates', [call('Page', 'API', 'create()'), back('API', 'Page', `{id: "${id}", …}`)]), trace('lists', [call('Page', 'API', 'list()')])];
+    const unstable = findUnstable(run('g-1a'), run('g-9z'));
+    assert.deepEqual(unstable.map((u) => u.test), ['creates']);
+    assert.match(unstable[0]!.example, /g-1a/);
+  });
+});

@@ -86,6 +86,8 @@ ul.tests li { margin: 4px 0; }
 section.test h2 .badge { margin-right: 8px; }
 ul.changes { margin: 0; padding: 12px 20px; list-style: none; font-size: 14px; border-bottom: 1px solid var(--border); }
 .summary { margin: 24px 0; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+.unstable { border-color: var(--changed); }
+.unstable p { margin: 8px 20px 0; color: var(--muted); }
 .where { display: inline-block; margin-left: 6px; border: 0; color: var(--muted); font-size: 13px; }
 .where > summary { padding: 0; display: inline; }
 .where ul { margin: 4px 0 2px; padding-left: 18px; }
