@@ -10,11 +10,6 @@ export default defineConfig([
     target: 'es2022',
   },
   {
-    entry: { 'global-teardown': 'src/jest/global-teardown.ts' },
-    format: ['cjs'],
-    target: 'es2022',
-  },
-  {
     entry: { cli: 'src/cli.ts' },
     format: ['esm'],
     target: 'node20',

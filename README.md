@@ -46,21 +46,18 @@ export const RecipesStore = signalStore(
 );
 ```
 
-In the Jest setup file:
+Then opt in the tests to record. No Jest config changes are needed: plotline only
+touches spec files that call `recordPlotline()`, so in a large repo the rest of the suite
+is unaffected. The simplest place is the helper that renders your feature, since every
+spec that imports it is then recorded.
+
+In that helper, name the services that should appear in the diagrams. Your mocks stay
+as they are; only the provider is wrapped:
 
 ```ts
-import { installTraceHooks } from '@tstapleton/plotline/jest';
-installTraceHooks();
-```
+import { provideTracing, recordPlotline, traced } from '@tstapleton/plotline/jest';
 
-and in `jest.config`, `globalTeardown: '@tstapleton/plotline/jest/global-teardown'` for
-an index of the diagrams.
-
-In the helper that renders your feature, name the services that should appear in the
-diagrams. Your mocks stay as they are; only the provider is wrapped:
-
-```ts
-import { provideTracing, traced } from '@tstapleton/plotline/jest';
+recordPlotline(); // records the spec files that import this helper
 
 await render(App, {
   providers: [
@@ -77,7 +74,12 @@ await render(App, {
 - `provideTracing({ ui, group })` switches recording on for the render, and names the
   UI and the box it and the stores sit in.
 
-Both do nothing unless the run sets `PLOTLINE=1`, so ordinary test runs are unaffected.
+- `recordPlotline()` registers hooks in the spec file that calls it (directly or through
+  a helper it imports), and patches Angular's change detection only while that file runs.
+
+All three do nothing unless the run sets `PLOTLINE=1`, so ordinary test runs are
+unaffected. On CI, point the action's `test-command` at just your feature's tests, e.g.
+`npx jest src/app/features/recipes`.
 
 ## Use it locally
 

@@ -20,7 +20,6 @@
       "import": "./dist/jest.js",
       "require": "./dist/jest.cjs"
     },
-    "./jest/global-teardown": "./dist/global-teardown.cjs",
     "./package.json": "./package.json"
   },
   "bin": {
