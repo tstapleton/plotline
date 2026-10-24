@@ -47,7 +47,9 @@ export function diffState(prev: Record<string, unknown>, next: Record<string, un
     const before = prev[key];
     const after = next[key];
     if (Object.is(before, after) || sameJson(before, after)) continue;
-    if (isRecord(before) && Object.keys(before).length && isRecord(after) && !('id' in after)) {
+    if (isEntityList(before) && isEntityList(after)) {
+      changes.push(...diffEntities(key, before, after));
+    } else if (isRecord(before) && Object.keys(before).length && isRecord(after) && !('id' in after)) {
       for (const sub of new Set([...Object.keys(before), ...Object.keys(after)])) {
         if (!Object.is(before[sub], after[sub])) changes.push(toChange(`${key}.${sub}`, before[sub], after[sub]));
       }
@@ -56,6 +58,35 @@ export function diffState(prev: Record<string, unknown>, next: Record<string, un
     }
   }
   return changes;
+}
+
+type Entity = Record<string, unknown> & { id: string | number };
+
+/** Lists of objects with ids are compared item by item: `recipes[r-1].favorite: false → true`. */
+function diffEntities(key: string, before: Entity[], after: Entity[]): StateChange[] {
+  const old = new Map(before.map((e) => [e.id, e]));
+  const now = new Map(after.map((e) => [e.id, e]));
+  const changes: StateChange[] = [];
+  for (const [id, entity] of now) {
+    const previous = old.get(id);
+    if (!previous) {
+      changes.push({ path: `${key}[${id}]`, after: summarize(entity), added: true });
+      continue;
+    }
+    if (previous === entity || sameJson(previous, entity)) continue;
+    for (const field of new Set([...Object.keys(previous), ...Object.keys(entity)])) {
+      if (!sameJson(previous[field], entity[field]) && !Object.is(previous[field], entity[field])) {
+        changes.push(toChange(`${key}[${id}].${field}`, previous[field], entity[field]));
+      }
+    }
+  }
+  for (const id of old.keys()) if (!now.has(id)) changes.push({ path: `${key}[${id}]` });
+  // A list replaced wholesale (say, first load) reads better as one line.
+  return changes.length > 6 || before.length === 0 ? [toChange(key, before, after)] : changes;
+}
+
+function isEntityList(value: unknown): value is Entity[] {
+  return Array.isArray(value) && value.length > 0 && value.every((v) => isRecord(v) && (typeof v['id'] === 'string' || typeof v['id'] === 'number'));
 }
 
 function toChange(path: string, before: unknown, after: unknown): StateChange {
