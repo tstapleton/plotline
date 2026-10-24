@@ -20,6 +20,8 @@ export interface DiffLabels {
 export function diffComment(diffs: TestDiff[], labels: DiffLabels): string {
   const summary = summarizeRun(diffs);
   const ordered = reviewOrder(diffs);
+  const changed = ordered.filter((d) => d.status !== 'unchanged');
+  const unchanged = ordered.filter((d) => d.status === 'unchanged');
   const counts = [
     `${summary.byStatus.changed} changed`,
     `${summary.byStatus.added} added`,
@@ -34,10 +36,17 @@ export function diffComment(diffs: TestDiff[], labels: DiffLabels): string {
     '',
     `<sub>Each diagram is one integration test, recorded on both sides. ${DIFF_MARKS.added} added · ${DIFF_MARKS.removed} removed · ${DIFF_MARKS.changed} changed · ${DIFF_MARKS.moved} moved. Unchanged stretches are collapsed.</sub>`,
     '',
-    '| Test | | Steps | Participants |',
-    '|---|---|---|---|',
-    ...ordered.map((d) => `| ${cell(d.test)}${d.renamedFrom ? `<br><sub>was: ${cell(d.renamedFrom)}</sub>` : ''} | ${statusLabel(d)} | ${countsText(d)} | ${participantsText(d)} |`),
-    '',
+    ...(changed.length
+      ? [
+          '| Test | | Steps | Participants |',
+          '|---|---|---|---|',
+          ...changed.map((d) => `| ${cell(d.test)}${d.renamedFrom ? `<br><sub>was: ${cell(d.renamedFrom)}</sub>` : ''} | ${statusLabel(d)} | ${countsText(d)} | ${participantsText(d)} |`),
+          '',
+        ]
+      : ['No test behaves differently.', '']),
+    ...(unchanged.length
+      ? [`<details><summary>${unchanged.length} unchanged test${unchanged.length > 1 ? 's' : ''}</summary>`, '', ...unchanged.map((d) => `- ${d.test}`), '', '</details>', '']
+      : []),
   ];
   if (labels.reportUrl) head.push(`[Open the full report](${labels.reportUrl}) for rendered diagrams with before and after side by side.`, '');
 
