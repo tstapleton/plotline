@@ -1,0 +1,62 @@
+{
+  "name": "@tstapleton/plotline",
+  "version": "0.0.0",
+  "description": "Sequence diagrams of Angular + NgRx SignalStore features, recorded from integration tests and diffed on pull requests.",
+  "license": "MIT",
+  "author": "Tom Stapleton <tstapleton@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tstapleton/plotline.git"
+  },
+  "type": "module",
+  "exports": {
+    "./store": {
+      "types": "./dist/store.d.ts",
+      "import": "./dist/store.js",
+      "require": "./dist/store.cjs"
+    },
+    "./jest": {
+      "types": "./dist/jest.d.ts",
+      "import": "./dist/jest.js",
+      "require": "./dist/jest.cjs"
+    },
+    "./jest/global-teardown": "./dist/global-teardown.cjs",
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "plotline": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test test/*.test.ts",
+    "prepack": "npm run build"
+  },
+  "peerDependencies": {
+    "@angular/core": ">=20",
+    "@ngrx/signals": ">=20",
+    "rxjs": "^7.8.0"
+  },
+  "dependencies": {
+    "pele": "1.9.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@angular/core": "^20.3.34",
+    "@ngrx/signals": "^20.1.0",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^22.20.5",
+    "rxjs": "^7.8.2",
+    "tsup": "^8.5.1",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3"
+  }
+}
