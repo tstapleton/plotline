@@ -1,0 +1,129 @@
+name: plotline
+description: Diff the sequence diagrams recorded by an Angular app's integration tests between a pull request and its base, and post the result as a PR comment.
+branding:
+  icon: git-pull-request
+  color: blue
+
+inputs:
+  working-directory:
+    description: Directory of the Angular app, relative to the repository root.
+    default: .
+  install-command:
+    description: Installs dependencies. Runs in the base checkout, and in the PR checkout too unless install-head is false.
+    default: npm ci --no-audit --no-fund
+  install-head:
+    description: Set to false if the workflow already installed dependencies in the PR checkout.
+    default: "true"
+  test-command:
+    description: Runs the integration tests. plotline sets PLOTLINE=1 and PLOTLINE_DIR around it.
+    default: npx jest
+  base-ref:
+    description: Commit to compare against. Defaults to the pull request's base commit.
+    default: ${{ github.event.pull_request.base.sha }}
+  comment:
+    description: Post (or update) a pull-request comment with the diff.
+    default: "true"
+  token:
+    description: Token used to post the comment.
+    default: ${{ github.token }}
+
+outputs:
+  changed:
+    description: Number of tests whose behaviour changed, was added or was removed.
+    value: ${{ steps.diff.outputs.changed }}
+  report-url:
+    description: Link to the uploaded HTML report.
+    value: ${{ steps.upload.outputs.artifact-url }}
+
+runs:
+  using: composite
+  steps:
+    # A worktree outside the workspace, so test runners in the PR checkout don't
+    # discover the base's tests.
+    - name: Check out the base commit
+      shell: bash
+      env:
+        BASE_REF: ${{ inputs.base-ref }}
+        BASE_DIR: ${{ runner.temp }}/plotline/base
+      run: |
+        git fetch --no-tags --depth=1 origin "$BASE_REF"
+        git worktree add --detach "$BASE_DIR" FETCH_HEAD
+
+    - name: Trace the base commit
+      shell: bash
+      working-directory: ${{ runner.temp }}/plotline/base/${{ inputs.working-directory }}
+      env:
+        INSTALL: ${{ inputs.install-command }}
+        TEST: ${{ inputs.test-command }}
+        PLOTLINE: "1"
+        PLOTLINE_DIR: ${{ runner.temp }}/plotline/traces-base
+      # The base may not record traces yet (e.g. the PR adds plotline), or its
+      # tests may fail; either way, diff whatever it produced.
+      run: |
+        mkdir -p "$PLOTLINE_DIR"
+        eval "$INSTALL"
+        eval "$TEST" || echo "::warning::Tests failed on the base commit; its diagrams may be incomplete."
+
+    - name: Trace the pull request
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        INSTALL: ${{ inputs.install-command }}
+        INSTALL_HEAD: ${{ inputs.install-head }}
+        TEST: ${{ inputs.test-command }}
+        PLOTLINE: "1"
+        PLOTLINE_DIR: ${{ runner.temp }}/plotline/traces-head
+      run: |
+        mkdir -p "$PLOTLINE_DIR"
+        if [ "$INSTALL_HEAD" = "true" ]; then eval "$INSTALL"; fi
+        eval "$TEST"
+
+    - name: Diff the diagrams
+      id: diff
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        TRACES: ${{ runner.temp }}/plotline
+        BASE_LABEL: ${{ github.event.pull_request.base.ref || inputs.base-ref }}
+        HEAD_LABEL: ${{ github.event.pull_request.head.ref || github.ref_name }}
+      run: |
+        npx --no-install plotline diff "$TRACES/traces-base" "$TRACES/traces-head" \
+          --out "$TRACES/diff" --base-label "$BASE_LABEL" --head-label "$HEAD_LABEL" | tee "$TRACES/summary.txt"
+        echo "changed=$(grep -oE '^[0-9]+' "$TRACES/summary.txt" | head -1)" >> "$GITHUB_OUTPUT"
+        # Artifacts are named after the file when not archived, so give it a unique name.
+        cp "$TRACES/diff/index.html" "$TRACES/diff/plotline-${{ github.run_id }}-${{ github.run_attempt }}.html"
+
+    - name: Upload the HTML report
+      id: upload
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        path: ${{ runner.temp }}/plotline/diff/plotline-${{ github.run_id }}-${{ github.run_attempt }}.html
+        archive: false
+        overwrite: true
+
+    - name: Post the pull-request comment
+      if: inputs.comment == 'true' && github.event.pull_request
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        TRACES: ${{ runner.temp }}/plotline
+        REPORT_URL: ${{ steps.upload.outputs.artifact-url }}
+        BASE_LABEL: ${{ github.event.pull_request.base.ref }}
+        HEAD_LABEL: ${{ github.event.pull_request.head.ref }}
+        PR: ${{ github.event.pull_request.number }}
+        REPO: ${{ github.repository }}
+      # Regenerate the comment now that the report has a link, then update the
+      # previous plotline comment rather than adding a new one per push.
+      run: |
+        npx --no-install plotline diff "$TRACES/traces-base" "$TRACES/traces-head" \
+          --out "$TRACES/comment" --base-label "$BASE_LABEL" --head-label "$HEAD_LABEL" --report-url "$REPORT_URL" > /dev/null
+        marker='<!-- plotline -->'
+        { echo "$marker"; cat "$TRACES/comment/comment.md"; } > "$TRACES/comment/body.md"
+        existing=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+          --jq ".[] | select(.body | startswith(\"$marker\")) | .id" | head -n 1)
+        if [ -n "$existing" ]; then
+          gh api --method PATCH "repos/$REPO/issues/comments/$existing" -F "body=@$TRACES/comment/body.md" > /dev/null
+        else
+          gh pr comment "$PR" --repo "$REPO" --body-file "$TRACES/comment/body.md"
+        fi
