@@ -24,3 +24,10 @@ describe('summarize', () => {
     assert.equal(summarize({ status: 503, statusText: 'Service Unavailable', headers: {} }), 'HTTP 503');
   });
 });
+
+describe('escape', () => {
+  it('keeps typed newlines from breaking a Mermaid message', async () => {
+    const { escape } = await import('../src/core/mermaid');
+    assert.equal(escape('2 eggs\n300 ml milk; #1'), '2 eggs ⏎ 300 ml milk#59; #35;1');
+  });
+});

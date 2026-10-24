@@ -81,7 +81,9 @@ export function noteText(lines: string[]): string {
   return shown.join('<br/>');
 }
 
-/** Mermaid treats `;` and `#` specially and `<`/`>` as HTML. */
+/** Mermaid treats `;` and `#` specially, `<`/`>` as HTML, and a newline ends the message. */
 export function escape(text: string): string {
-  return text.replace(/[#;<>]/g, (c) => ({ '#': '#35;', ';': '#59;', '<': '#lt;', '>': '#gt;' })[c]!);
+  return text
+    .replace(/[#;<>]/g, (c) => ({ '#': '#35;', ';': '#59;', '<': '#lt;', '>': '#gt;' })[c]!)
+    .replace(/\r?\n/g, ' ⏎ ');
 }
