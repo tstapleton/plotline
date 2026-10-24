@@ -1,11 +1,23 @@
 import { mergeRepeatedGestures } from './merge';
 import { describeChange, Participant, TraceEvent, TraceFile } from './model';
+import { sectionMark, splitSections } from './sections';
 
-/** Renders one recorded test as a Mermaid sequence diagram. */
+/**
+ * Renders one recorded test as a Mermaid sequence diagram. User actions are numbered
+ * ①, ②, … and anything before the first is headed "Setup".
+ */
 export function toSequenceDiagram(trace: TraceFile): string {
   const events = mergeRepeatedGestures(trace.events);
   const cast = castOf(trace.ui, trace.participants, events);
-  return ['sequenceDiagram', '  autonumber', ...cast.declarations, ...events.map((e) => `  ${cast.message(e)}`)].join('\n');
+  const lines = ['sequenceDiagram', ...cast.declarations];
+  const sections = splitSections(events, (e) => e.kind === 'user');
+  for (const section of sections) {
+    if (section.number === 0 && sections.length > 1) lines.push(`  Note over ${cast.span}: Setup`);
+    for (const e of section.items) {
+      lines.push(`  ${e.kind === 'user' ? cast.message(e, `${sectionMark(section.number)} ${e.text}`) : cast.message(e)}`);
+    }
+  }
+  return lines.join('\n');
 }
 
 export interface Cast {
@@ -15,6 +27,8 @@ export interface Cast {
   id(name: string): string;
   /** The Mermaid line for one event (without indentation). */
   message(event: TraceEvent, label?: string): string;
+  /** `first,last` participant ids, for notes across the whole diagram. */
+  span: string;
 }
 
 /**
@@ -73,7 +87,9 @@ export function castOf(ui: string, participants: Participant[], events: TraceEve
     }
   };
 
-  return { declarations, id, message };
+  const ids = [...(events.some((e) => e.kind === 'user') ? ['U'] : []), ...ordered.map(id)];
+  const span = ids.length > 1 ? `${ids[0]},${ids[ids.length - 1]}` : ids[0]!;
+  return { declarations, id, message, span };
 }
 
 /** Joins note lines, showing at most five. */

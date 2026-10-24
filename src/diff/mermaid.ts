@@ -1,5 +1,6 @@
 import { castOf, escape, noteText } from '../core/mermaid';
 import { describeChange, Participant, TraceEvent } from '../core/model';
+import { sectionMark, splitSections } from '../core/sections';
 import { DiffOp, TestDiff, textOf } from './align';
 
 /** Translucent fills, so the highlights read on light and dark themes alike. */
@@ -14,8 +15,9 @@ export const DIFF_MARKS = { added: '+', removed: '−', changed: 'Δ', moved: '�
 
 /**
  * One sequence diagram for a test's base and head runs: unchanged steps as usual,
- * added, removed and changed steps inside coloured blocks, and unchanged stretches
- * longer than `context` steps either side of a change collapsed into a note.
+ * added, removed and changed steps inside coloured blocks. A user action whose steps
+ * didn't change collapses to one line naming it; within a changed one, unchanged
+ * stretches longer than `context` steps either side of a change collapse too.
  */
 export function toDiffDiagram(diff: TestDiff, context = 2): string {
   const participants = uniqueParticipants([...(diff.head?.participants ?? []), ...(diff.base?.participants ?? [])]);
@@ -26,50 +28,72 @@ export function toDiffDiagram(diff: TestDiff, context = 2): string {
   const cast = castOf(ui, participants, everyEvent, (name) =>
     added.has(name) ? `${name} (new)` : removed.has(name) ? `${name} (removed)` : name,
   );
-  const span = spanOf(cast.declarations);
+  const collapse = diff.status === 'changed';
 
-  const shown = visibleOps(diff.ops, diff.status === 'changed' ? context : Infinity);
   const lines = ['sequenceDiagram', ...cast.declarations];
   let block: DiffOp['op'] | undefined;
   const closeBlock = () => {
     if (block && block !== 'same') lines.push('  end');
     block = undefined;
   };
+  const collapsed = (title: string, steps: number) => {
+    closeBlock();
+    lines.push(`  Note over ${cast.span}: ⋯ ${escape(title)} · ${steps} unchanged step${steps === 1 ? '' : 's'} ⋯`);
+  };
 
-  for (let i = 0; i < diff.ops.length; i++) {
-    if (!shown[i]) {
-      let hidden = 0;
-      while (i < diff.ops.length && !shown[i]) {
-        hidden++;
-        i++;
-      }
-      i--;
-      closeBlock();
-      lines.push(`  Note over ${span}: ⋯ ${hidden} unchanged step${hidden > 1 ? 's' : ''} ⋯`);
+  const sections = splitSections(diff.ops, (o) => o.event.kind === 'user');
+  for (const section of sections) {
+    const action = section.number ? section.items[0]!.event : undefined;
+    const title = action?.kind === 'user' ? `${sectionMark(section.number)} ${action.text}` : 'Setup';
+
+    if (collapse && section.items.every((o) => o.op === 'same')) {
+      collapsed(title, section.items.length - (action ? 1 : 0));
       continue;
     }
-
-    const o = diff.ops[i];
-    if (o.op !== block) {
+    if (!action && sections.length > 1) {
       closeBlock();
-      if (o.op !== 'same') lines.push(`  rect ${DIFF_FILLS[o.op]}`);
-      block = o.op;
+      lines.push(`  Note over ${cast.span}: Setup`);
     }
-    const indent = o.op === 'same' ? '  ' : '    ';
-    for (const line of linesFor(o, cast.message, cast.id)) lines.push(indent + line);
+
+    // The user action itself always shows, so the section keeps its heading.
+    const shown = visibleOps(section.items, collapse ? context : Infinity);
+    if (action) shown[0] = true;
+    for (let i = 0; i < section.items.length; i++) {
+      if (!shown[i]) {
+        let hidden = 0;
+        while (i < section.items.length && !shown[i]) {
+          hidden++;
+          i++;
+        }
+        i--;
+        closeBlock();
+        lines.push(`  Note over ${cast.span}: ⋯ ${hidden} unchanged step${hidden > 1 ? 's' : ''} ⋯`);
+        continue;
+      }
+      const o = section.items[i]!;
+      if (o.op !== block) {
+        closeBlock();
+        if (o.op !== 'same') lines.push(`  rect ${DIFF_FILLS[o.op]}`);
+        block = o.op;
+      }
+      const indent = o.op === 'same' ? '  ' : '    ';
+      const mark = o.event.kind === 'user' ? sectionMark(section.number) : undefined;
+      for (const line of linesFor(o, cast.message, cast.id, mark)) lines.push(indent + line);
+    }
   }
   closeBlock();
   return lines.join('\n');
 }
 
-function linesFor(o: DiffOp, message: (e: TraceEvent, label?: string) => string, id: (name: string) => string): string[] {
-  if (o.op === 'same') return [message(o.event)];
+function linesFor(o: DiffOp, message: (e: TraceEvent, label?: string) => string, id: (name: string) => string, sectionMark?: string): string[] {
+  const numbered = (e: TraceEvent, label: string) => (sectionMark && e.kind === 'user' ? label.replace(e.text, `${sectionMark} ${e.text}`) : label);
+  if (o.op === 'same') return [o.event.kind === 'user' ? message(o.event, numbered(o.event, o.event.text)) : message(o.event)];
   if (o.op === 'changed') {
     const was = o.event.kind === 'note' ? changedNoteLines(o.before, o.event) : textOf(o.before);
     const [a, b] = endsOf(o.event);
-    return [message(o.event, prefixed(DIFF_MARKS.changed, o.event)), `Note over ${id(a)}${a === b ? '' : `,${id(b)}`}: was ${escape(was)}`];
+    return [message(o.event, numbered(o.event, prefixed(DIFF_MARKS.changed, o.event))), `Note over ${id(a)}${a === b ? '' : `,${id(b)}`}: was ${escape(was)}`];
   }
-  return [message(o.event, prefixed(DIFF_MARKS[o.op], o.event))];
+  return [message(o.event, numbered(o.event, prefixed(DIFF_MARKS[o.op], o.event)))];
 }
 
 /** Label with a diff mark in front; notes keep their line breaks. */
@@ -105,12 +129,6 @@ function visibleOps(ops: DiffOp[], context: number): boolean[] {
     if (!shown[i] && (i === 0 || shown[i - 1]) && (i === ops.length - 1 || shown[i + 1])) shown[i] = true;
   }
   return shown;
-}
-
-/** `first,last` participant ids, for notes spanning the whole diagram. */
-function spanOf(declarations: string[]): string {
-  const ids = declarations.map((d) => /(?:participant|actor) (\S+) as/.exec(d)?.[1]).filter((x): x is string => !!x);
-  return ids.length > 1 ? `${ids[0]},${ids[ids.length - 1]}` : ids[0];
 }
 
 function uniqueParticipants(list: Participant[]): Participant[] {
