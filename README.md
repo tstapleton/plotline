@@ -179,8 +179,12 @@ either side of a change are collapsed.
   shows boundaries only.
 - **Components.** A call made from a component (its template, a lifecycle hook or a
   method) is drawn from that component, e.g. `RecipeDetailPage ->> Recipe store`. User
-  actions go to the component whose template holds the element. This uses the debugging
-  helpers Angular publishes in development mode, which TestBed runs in. Anything plotline
+  actions go to the component whose template holds the element, and a component's
+  `output()` is drawn as a message to the parent listening to it, so a click in a child
+  reads `User ->> Stepper`, `Stepper ->> Page: changed(4)`, `Page ->> Store`. This uses
+  the debugging
+  helpers Angular publishes in development mode, which TestBed runs in. (`@Output()`
+  EventEmitters aren't drawn yet, only `output()`.) Anything plotline
   can't place, such as change detection, is the generic UI.
 - **State.** `watchState` turns each `patchState` into a note of what changed
   (`status: "loading" → "ready"`). Lists of entities are compared by id
@@ -194,9 +198,6 @@ either side of a change are collapsed.
 - Tests must record the same thing every run. Random ids, real timestamps and
   `Date.now()` in your test doubles show up as changes on every PR. Give mocks
   predictable ids and a fixed clock; the stability check points these out.
-- A component's output (`@Output`/`output()`) isn't drawn as its own message: a click in
-  a child component shows as the user acting on the child, then the parent calling the
-  store.
 - A diagram shows one run, the path this test took. It is not every possible path.
 - `withTracing` must come after the features it should cover and before `withHooks`.
 - Computeds the store doesn't expose are evaluated in their reader's context. Calls they

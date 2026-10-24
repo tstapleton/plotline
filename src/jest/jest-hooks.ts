@@ -1,4 +1,4 @@
-import { ApplicationRef } from '@angular/core';
+import { ApplicationRef, OutputEmitterRef } from '@angular/core';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { basename, join, relative, resolve } from 'node:path';
 import { recordUserEvents } from './dom-recorder';
@@ -27,11 +27,17 @@ export function recordPlotline(): void {
   let restoreTick: () => void = () => undefined;
   let stopRecordingDom: () => void = () => undefined;
 
+  let restoreOutputs: () => void = () => undefined;
+
   beforeAll(() => {
     restoreTick = attributeChangeDetectionToUi();
+    restoreOutputs = recordOutputs();
   });
 
-  afterAll(() => restoreTick());
+  afterAll(() => {
+    restoreTick();
+    restoreOutputs();
+  });
 
   beforeEach(() => {
     tracer.start();
@@ -72,6 +78,22 @@ function attributeChangeDetectionToUi(): () => void {
   };
   return () => {
     appRef[tickName] = tick;
+  };
+}
+
+/**
+ * Draws a component's output as a message to the parent listening to it, so a click in
+ * a child reads: User ->> Stepper, Stepper ->> Page: changed(4), Page ->> Store.
+ */
+function recordOutputs(): () => void {
+  const proto = OutputEmitterRef.prototype as unknown as { emit(value: unknown): void };
+  const emit = proto.emit;
+  proto.emit = function (this: object, value: unknown) {
+    tracer.recordOutput(this, value);
+    return emit.call(this, value);
+  };
+  return () => {
+    proto.emit = emit;
   };
 }
 

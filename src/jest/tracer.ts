@@ -4,7 +4,7 @@ import { getState, StateSource, watchState } from '@ngrx/signals';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { TraceSink } from '../store/with-tracing';
 import { Participant, TraceEvent } from '../core/model';
-import { classesOnStack, renderedComponents } from './components';
+import { classesOnStack, outputSource, renderedComponents } from './components';
 import { baseObservable, isObservable } from './observable';
 import { diffState, summarize, summarizeArgs } from './summarize';
 
@@ -99,6 +99,16 @@ export class Tracer implements TraceSink {
   /** Notes which components are on the page now, to resolve placeholders later. */
   observeComponents(): void {
     if (this.recording && this.pending.size) for (const name of renderedComponents()) this.components.add(name);
+  }
+
+  /** A component output, drawn from the emitting child to the parent listening. */
+  recordOutput(emitter: object, value: unknown): void {
+    if (!this.recording) return;
+    const source = outputSource(emitter);
+    if (!source || source.child === source.parent) return;
+    this.addComponent(source.child);
+    this.addComponent(source.parent);
+    this.record({ kind: 'call', from: source.child, to: source.parent, label: `${source.output}(${value === undefined ? '' : summarize(value)})` });
   }
 
   /** Registers a component as a participant, in the same box as the UI. */

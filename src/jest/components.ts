@@ -9,6 +9,34 @@ interface NgDebug {
   getOwningComponent(element: Element): object | null;
 }
 
+export interface OutputSource {
+  /** The component emitting. */
+  child: string;
+  /** The component whose template listens. */
+  parent: string;
+  /** The output's property name, e.g. `servingsChange`. */
+  output: string;
+}
+
+/**
+ * Which rendered component an output belongs to, found by looking for the component
+ * that holds this OutputEmitterRef, and which component's template uses it.
+ */
+export function outputSource(emitter: object): OutputSource | undefined {
+  const debug = ng();
+  if (!debug) return undefined;
+  for (const element of Array.from(document.querySelectorAll('*'))) {
+    const component = debug.getComponent(element) as Record<string, unknown> | null;
+    if (!component) continue;
+    const output = Object.keys(component).find((key) => component[key] === emitter);
+    if (!output) continue;
+    const child = nameOf(component);
+    const parent = nameOf(debug.getOwningComponent(element));
+    return child && parent ? { child, parent, output } : undefined;
+  }
+  return undefined;
+}
+
 function ng(): NgDebug | undefined {
   const candidate = (globalThis as { ng?: Partial<NgDebug> }).ng;
   return typeof candidate?.getComponent === 'function' && typeof candidate.getOwningComponent === 'function' ? (candidate as NgDebug) : undefined;
