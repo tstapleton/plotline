@@ -23,7 +23,7 @@ export function recordUserEvents(tracer: Tracer, root: Document = document): () 
   const onClick = (event: Event) => {
     const el = (event.target as Element | null)?.closest('button, a, [role="button"]');
     if (el) {
-      tracer.record({ kind: 'user', to: tracer.uiName, key: `click:${elementKey(el)}`, text: `clicks ${quote(el.textContent?.trim() || el.getAttribute('aria-label') || el.tagName)}` });
+      tracer.record({ kind: 'user', to: tracer.uiName, key: `click:${elementKey(el)}`, text: `clicks ${quote(el.getAttribute('aria-label') || el.textContent?.trim() || el.tagName)}` });
     }
   };
 
