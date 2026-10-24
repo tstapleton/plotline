@@ -11,6 +11,7 @@ export function summarize(value: unknown, depth = 0, budget = 45): string {
   if (typeof value === 'function') return isSignal(value) ? 'Signal' : 'fn';
   if (isObservable(value)) return 'Observable';
   if (value instanceof Error) return `${value.name}: ${truncate(value.message, 40)}`;
+  if (isHttpError(value)) return `HTTP ${value.status}`;
   if (Array.isArray(value)) {
     if (depth > 0 || value.length > 3) return `[${value.length}]`;
     return `[${value.map((v) => summarize(v, depth + 1)).join(', ')}]`;
@@ -71,6 +72,11 @@ function sameJson(a: unknown, b: unknown): boolean {
 
 function isScalar(value: unknown): boolean {
   return value === null || ['string', 'number', 'boolean'].includes(typeof value);
+}
+
+/** Angular's HttpErrorResponse and look-alikes, which aren't Error instances. */
+function isHttpError(value: unknown): value is { status: number } {
+  return typeof value === 'object' && value !== null && typeof (value as { status?: unknown }).status === 'number' && 'statusText' in value;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
