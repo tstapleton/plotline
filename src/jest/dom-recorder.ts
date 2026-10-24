@@ -7,7 +7,7 @@ import { Tracer } from './tracer';
 export function recordUserEvents(tracer: Tracer, root: Document = document): () => void {
   const onInput = (event: Event) => {
     const el = event.target;
-    if (el instanceof HTMLInputElement && !isToggle(el)) {
+    if ((el instanceof HTMLInputElement && !isToggle(el)) || el instanceof HTMLTextAreaElement) {
       tracer.record({ kind: 'user', to: tracer.uiName, key: `type:${elementKey(el)}`, text: `types ${quote(el.value)} into ${quote(labelOf(el))}` });
     }
   };
@@ -23,7 +23,8 @@ export function recordUserEvents(tracer: Tracer, root: Document = document): () 
   const onClick = (event: Event) => {
     const el = (event.target as Element | null)?.closest('button, a, [role="button"]');
     if (el) {
-      tracer.record({ kind: 'user', to: tracer.uiName, key: `click:${elementKey(el)}`, text: `clicks ${quote(el.getAttribute('aria-label') || el.textContent?.trim() || el.tagName)}` });
+      const name = el.getAttribute('aria-label') || el.textContent?.trim().replace(/\s+/g, ' ') || el.tagName.toLowerCase();
+      tracer.record({ kind: 'user', to: tracer.uiName, key: `click:${el.id || name}`, text: `clicks ${quote(name)}` });
     }
   };
 
