@@ -42,7 +42,8 @@ export function castOf(ui: string, participants: Participant[], events: TraceEve
   if (events.some((e) => (e.kind === 'user' ? e.to : e.kind === 'note' ? e.over : `${e.from}\n${e.to}`).split('\n').includes(ui))) add(ui);
   for (const e of events) {
     if (e.kind === 'note') add(e.over);
-    else if (e.kind !== 'user') {
+    else if (e.kind === 'user') add(e.to);
+    else {
       add(e.from);
       add(e.to);
     }

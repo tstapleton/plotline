@@ -165,10 +165,11 @@ export function textOf(e: TraceEvent): string {
 }
 
 function namesIn(trace: TraceFile): string[] {
-  const names = new Set<string>([trace.ui]);
+  const names = new Set<string>();
   for (const e of trace.events) {
     if (e.kind === 'note') names.add(e.over);
-    else if (e.kind !== 'user') {
+    else if (e.kind === 'user') names.add(e.to);
+    else {
       names.add(e.from);
       names.add(e.to);
     }

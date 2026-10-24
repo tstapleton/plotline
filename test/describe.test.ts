@@ -61,3 +61,12 @@ describe('observables', () => {
     assert.equal(isObservable(Promise.resolve(1)), false);
   });
 });
+
+describe('toSequenceDiagram', () => {
+  it('declares a component that only receives user actions', async () => {
+    const { toSequenceDiagram } = await import('../src/core/mermaid');
+    const diagram = toSequenceDiagram(trace('t', [{ kind: 'user', to: 'Stepper', text: 'clicks "More"', key: 'click:More' }, call('Page', 'Store', 'setServings(4)')]));
+    assert.match(diagram, /participant P\d as Stepper/);
+    assert.doesNotMatch(diagram, /P-1/);
+  });
+});
