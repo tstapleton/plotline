@@ -22,6 +22,12 @@
     },
     "./package.json": "./package.json"
   },
+  "typesVersions": {
+    "*": {
+      "store": ["dist/store.d.ts"],
+      "jest": ["dist/jest.d.ts"]
+    }
+  },
   "bin": {
     "plotline": "./dist/cli.js"
   },
