@@ -1,7 +1,7 @@
-import { castOf, escape, noteText } from '../core/mermaid';
-import { describeChange, Participant, TraceEvent } from '../core/model';
+import { castOf, escapeText, noteText } from '../core/mermaid';
+import { describeChange, type Participant, type TraceEvent } from '../core/model';
 import { sectionMark, splitSections } from '../core/sections';
-import { DiffOp, TestDiff, textOf } from './align';
+import { type DiffOp, latestTrace, type TestDiff, textOf } from './align';
 
 /** Translucent fills, so the highlights read on light and dark themes alike. */
 export const DIFF_FILLS = {
@@ -21,7 +21,7 @@ export const DIFF_MARKS = { added: '+', removed: '−', changed: 'Δ', moved: '�
  */
 export function toDiffDiagram(diff: TestDiff, context = 2): string {
   const participants = uniqueParticipants([...(diff.head?.participants ?? []), ...(diff.base?.participants ?? [])]);
-  const ui = (diff.head ?? diff.base)!.ui;
+  const ui = latestTrace(diff).ui;
   const everyEvent = diff.ops.flatMap((o) => (o.op === 'changed' ? [o.event, o.before] : [o.event]));
   const added = new Set(diff.participants.added);
   const removed = new Set(diff.participants.removed);
@@ -38,12 +38,12 @@ export function toDiffDiagram(diff: TestDiff, context = 2): string {
   };
   const collapsed = (title: string, steps: number) => {
     closeBlock();
-    lines.push(`  Note over ${cast.span}: ⋯ ${escape(title)} · ${steps} unchanged step${steps === 1 ? '' : 's'} ⋯`);
+    lines.push(`  Note over ${cast.span}: ⋯ ${escapeText(title)} · ${steps} unchanged step${steps === 1 ? '' : 's'} ⋯`);
   };
 
   const sections = splitSections(diff.ops, (o) => o.event.kind === 'user');
   for (const section of sections) {
-    const action = section.number ? section.items[0]!.event : undefined;
+    const action = section.number ? section.items[0].event : undefined;
     const title = action?.kind === 'user' ? `${sectionMark(section.number)} ${action.text}` : 'Setup';
 
     if (collapse && section.items.every((o) => o.op === 'same')) {
@@ -70,7 +70,7 @@ export function toDiffDiagram(diff: TestDiff, context = 2): string {
         lines.push(`  Note over ${cast.span}: ⋯ ${hidden} unchanged step${hidden > 1 ? 's' : ''} ⋯`);
         continue;
       }
-      const o = section.items[i]!;
+      const o = section.items[i];
       if (o.op !== block) {
         closeBlock();
         if (o.op !== 'same') lines.push(`  rect ${DIFF_FILLS[o.op]}`);
@@ -85,13 +85,23 @@ export function toDiffDiagram(diff: TestDiff, context = 2): string {
   return lines.join('\n');
 }
 
-function linesFor(o: DiffOp, message: (e: TraceEvent, label?: string) => string, id: (name: string) => string, sectionMark?: string): string[] {
-  const numbered = (e: TraceEvent, label: string) => (sectionMark && e.kind === 'user' ? label.replace(e.text, `${sectionMark} ${e.text}`) : label);
-  if (o.op === 'same') return [o.event.kind === 'user' ? message(o.event, numbered(o.event, o.event.text)) : message(o.event)];
+function linesFor(
+  o: DiffOp,
+  message: (e: TraceEvent, label?: string) => string,
+  id: (name: string) => string,
+  sectionMark?: string,
+): string[] {
+  const numbered = (e: TraceEvent, label: string) =>
+    sectionMark && e.kind === 'user' ? label.replace(e.text, `${sectionMark} ${e.text}`) : label;
+  if (o.op === 'same')
+    return [o.event.kind === 'user' ? message(o.event, numbered(o.event, o.event.text)) : message(o.event)];
   if (o.op === 'changed') {
     const was = o.event.kind === 'note' ? changedNoteLines(o.before, o.event) : textOf(o.before);
     const [a, b] = endsOf(o.event);
-    return [message(o.event, numbered(o.event, prefixed(DIFF_MARKS.changed, o.event))), `Note over ${id(a)}${a === b ? '' : `,${id(b)}`}: was ${escape(was)}`];
+    return [
+      message(o.event, numbered(o.event, prefixed(DIFF_MARKS.changed, o.event))),
+      `Note over ${id(a)}${a === b ? '' : `,${id(b)}`}: was ${escapeText(was)}`,
+    ];
   }
   return [message(o.event, numbered(o.event, prefixed(DIFF_MARKS[o.op], o.event)))];
 }

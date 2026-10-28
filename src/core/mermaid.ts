@@ -1,5 +1,5 @@
 import { mergeRepeatedGestures } from './merge';
-import { describeChange, Participant, TraceEvent, TraceFile } from './model';
+import { describeChange, type Participant, type TraceEvent, type TraceFile } from './model';
 import { sectionMark, splitSections } from './sections';
 
 /**
@@ -14,7 +14,9 @@ export function toSequenceDiagram(trace: TraceFile): string {
   for (const section of sections) {
     if (section.number === 0 && sections.length > 1) lines.push(`  Note over ${cast.span}: Setup`);
     for (const e of section.items) {
-      lines.push(`  ${e.kind === 'user' ? cast.message(e, `${sectionMark(section.number)} ${e.text}`) : cast.message(e)}`);
+      lines.push(
+        `  ${e.kind === 'user' ? cast.message(e, `${sectionMark(section.number)} ${e.text}`) : cast.message(e)}`,
+      );
     }
   }
   return lines.join('\n');
@@ -35,11 +37,21 @@ export interface Cast {
  * Orders participants by first appearance, keeping each group contiguous so it can be
  * drawn as a box. The UI always comes first, after the user.
  */
-export function castOf(ui: string, participants: Participant[], events: TraceEvent[], decorate: (name: string) => string = (n) => n): Cast {
+export function castOf(
+  ui: string,
+  participants: Participant[],
+  events: TraceEvent[],
+  decorate: (name: string) => string = (n) => n,
+): Cast {
   const seen: string[] = [];
   const add = (name: string) => !seen.includes(name) && seen.push(name);
   // The generic UI comes first when it's used; with components it often isn't.
-  if (events.some((e) => (e.kind === 'user' ? e.to : e.kind === 'note' ? e.over : `${e.from}\n${e.to}`).split('\n').includes(ui))) add(ui);
+  if (
+    events.some((e) =>
+      (e.kind === 'user' ? e.to : e.kind === 'note' ? e.over : `${e.from}\n${e.to}`).split('\n').includes(ui),
+    )
+  )
+    add(ui);
   for (const e of events) {
     if (e.kind === 'note') add(e.over);
     else if (e.kind === 'user') add(e.to);
@@ -55,7 +67,9 @@ export function castOf(ui: string, participants: Participant[], events: TraceEve
     const slot = groupOf(name) ?? `\u0000${name}`;
     if (!slots.includes(slot)) slots.push(slot);
   }
-  const ordered = [...seen].sort((a, b) => slots.indexOf(groupOf(a) ?? `\u0000${a}`) - slots.indexOf(groupOf(b) ?? `\u0000${b}`));
+  const ordered = [...seen].sort(
+    (a, b) => slots.indexOf(groupOf(a) ?? `\u0000${a}`) - slots.indexOf(groupOf(b) ?? `\u0000${b}`),
+  );
 
   const id = (name: string) => (name === 'User' ? 'U' : `P${ordered.indexOf(name)}`);
 
@@ -66,43 +80,43 @@ export function castOf(ui: string, participants: Participant[], events: TraceEve
     const group = groupOf(name);
     if (group !== openGroup) {
       if (openGroup) declarations.push('  end');
-      if (group) declarations.push(`  box ${escape(group)}`);
+      if (group) declarations.push(`  box ${escapeText(group)}`);
       openGroup = group;
     }
-    declarations.push(`  ${group ? '  ' : ''}participant ${id(name)} as ${escape(decorate(name))}`);
+    declarations.push(`  ${group ? '  ' : ''}participant ${id(name)} as ${escapeText(decorate(name))}`);
   }
   if (openGroup) declarations.push('  end');
 
   const message = (e: TraceEvent, label?: string): string => {
     switch (e.kind) {
       case 'user':
-        return `U->>${id(e.to)}: ${escape(label ?? e.text)}`;
+        return `U->>${id(e.to)}: ${escapeText(label ?? e.text)}`;
       case 'call':
-        return `${id(e.from)}->>${id(e.to)}: ${escape(label ?? e.label)}`;
+        return `${id(e.from)}->>${id(e.to)}: ${escapeText(label ?? e.label)}`;
       case 'return':
-        return `${id(e.from)}-->>${id(e.to)}: ${escape(label ?? e.label)}`;
+        return `${id(e.from)}-->>${id(e.to)}: ${escapeText(label ?? e.label)}`;
       case 'throw':
-        return `${id(e.from)}--x${id(e.to)}: ${escape(label ?? e.label)}`;
+        return `${id(e.from)}--x${id(e.to)}: ${escapeText(label ?? e.label)}`;
       case 'note':
         return `Note over ${id(e.over)}: ${label ?? noteText(e.changes.map(describeChange))}`;
     }
   };
 
   const ids = [...(events.some((e) => e.kind === 'user') ? ['U'] : []), ...ordered.map(id)];
-  const span = ids.length > 1 ? `${ids[0]},${ids[ids.length - 1]}` : ids[0]!;
+  const span = ids.length > 1 ? `${ids[0]},${ids[ids.length - 1]}` : ids[0];
   return { declarations, id, message, span };
 }
 
 /** Joins note lines, showing at most five. */
 export function noteText(lines: string[]): string {
-  const shown = lines.slice(0, 5).map(escape);
+  const shown = lines.slice(0, 5).map(escapeText);
   if (lines.length > 5) shown.push(`…${lines.length - 5} more`);
   return shown.join('<br/>');
 }
 
+const MERMAID_ESCAPES: Record<string, string> = { '#': '#35;', ';': '#59;', '<': '#lt;', '>': '#gt;' };
+
 /** Mermaid treats `;` and `#` specially, `<`/`>` as HTML, and a newline ends the message. */
-export function escape(text: string): string {
-  return text
-    .replace(/[#;<>]/g, (c) => ({ '#': '#35;', ';': '#59;', '<': '#lt;', '>': '#gt;' })[c]!)
-    .replace(/\r?\n/g, ' ⏎ ');
+export function escapeText(text: string): string {
+  return text.replace(/[#;<>]/g, (c) => MERMAID_ESCAPES[c]).replace(/\r?\n/g, ' ⏎ ');
 }

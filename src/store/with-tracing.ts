@@ -1,5 +1,5 @@
 import { InjectionToken, inject } from '@angular/core';
-import { EmptyFeatureResult, SignalStoreFeature, SignalStoreFeatureResult } from '@ngrx/signals';
+import type { EmptyFeatureResult, SignalStoreFeature, SignalStoreFeatureResult } from '@ngrx/signals';
 
 /**
  * Receives a store's internals while it is being built. Only provided by the test
@@ -14,7 +14,8 @@ export interface TraceSink {
 const TOKEN_KEY = Symbol.for('@tstapleton/plotline/TRACE_SINK');
 const registry = globalThis as unknown as Record<symbol, InjectionToken<TraceSink> | undefined>;
 
-export const TRACE_SINK: InjectionToken<TraceSink> = (registry[TOKEN_KEY] ??= new InjectionToken<TraceSink>('TRACE_SINK'));
+registry[TOKEN_KEY] ??= new InjectionToken<TraceSink>('TRACE_SINK');
+export const TRACE_SINK: InjectionToken<TraceSink> = registry[TOKEN_KEY];
 
 /**
  * Marks a SignalStore as a participant in generated sequence diagrams.

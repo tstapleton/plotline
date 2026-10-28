@@ -1,4 +1,4 @@
-import { TraceEvent } from './model';
+import type { TraceEvent } from './model';
 
 /**
  * Repeated gestures on the same control (one `setValue` per keystroke) are merged:

@@ -1,6 +1,13 @@
-import { ClassProvider, FactoryProvider, Provider, Type, ValueProvider, inject } from '@angular/core';
+import {
+  type ClassProvider,
+  type FactoryProvider,
+  inject,
+  type Provider,
+  type Type,
+  type ValueProvider,
+} from '@angular/core';
 import { TRACE_SINK } from '../store/with-tracing';
-import { ParticipantOptions, tracer, tracingEnabled } from './tracer';
+import { type ParticipantOptions, tracer, tracingEnabled } from './tracer';
 
 /**
  * Registers the trace sink so stores marked with `withTracing()` report to it.

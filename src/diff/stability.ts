@@ -1,4 +1,4 @@
-import { TraceFile, traceKey } from '../core/model';
+import { type TraceFile, traceKey } from '../core/model';
 import { diffRuns } from './align';
 import { describeTest } from './describe';
 

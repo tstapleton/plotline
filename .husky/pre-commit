@@ -1,0 +1,5 @@
+if [ "$(git branch --show-current)" = "main" ]; then
+  echo "Don't commit to main: create a branch and open a pull request." >&2
+  exit 1
+fi
+npm run verify

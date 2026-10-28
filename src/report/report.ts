@@ -1,5 +1,5 @@
 import { toSequenceDiagram } from '../core/mermaid';
-import { TraceFile } from '../core/model';
+import type { TraceFile } from '../core/model';
 import { html, page, slug, svgOf } from './page';
 
 /** One page with every test's sequence diagram, rendered by Pele. */

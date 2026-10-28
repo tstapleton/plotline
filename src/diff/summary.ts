@@ -1,4 +1,4 @@
-import { TestDiff, TestStatus } from './align';
+import type { TestDiff, TestStatus } from './align';
 import { DIFF_MARKS } from './mermaid';
 
 export interface RunSummary {
@@ -17,7 +17,9 @@ export function summarizeRun(diffs: TestDiff[]): RunSummary {
 export function reviewOrder(diffs: TestDiff[]): TestDiff[] {
   const rank: Record<TestStatus, number> = { changed: 0, added: 1, removed: 2, unchanged: 3 };
   const size = (d: TestDiff) => d.counts.added + d.counts.removed + d.counts.changed;
-  return [...diffs].sort((a, b) => rank[a.status] - rank[b.status] || size(b) - size(a) || a.test.localeCompare(b.test));
+  return [...diffs].sort(
+    (a, b) => rank[a.status] - rank[b.status] || size(b) - size(a) || a.test.localeCompare(b.test),
+  );
 }
 
 /** e.g. `+7 −2 Δ1 ↕10`. */

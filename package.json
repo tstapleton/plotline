@@ -24,8 +24,12 @@
   },
   "typesVersions": {
     "*": {
-      "store": ["dist/store.d.ts"],
-      "jest": ["dist/jest.d.ts"]
+      "store": [
+        "dist/store.d.ts"
+      ],
+      "jest": [
+        "dist/jest.d.ts"
+      ]
     }
   },
   "bin": {
@@ -41,6 +45,10 @@
     "build": "tsup",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test test/*.test.ts",
+    "lint": "biome check",
+    "format": "biome check --write",
+    "verify": "npm run typecheck && npm run lint && npm test && npm run build && npm pack --dry-run --silent",
+    "prepare": "husky",
     "prepack": "npm run build"
   },
   "peerDependencies": {
@@ -55,9 +63,11 @@
   },
   "devDependencies": {
     "@angular/core": "20.3.34",
+    "@biomejs/biome": "2.5.15",
     "@ngrx/signals": "20.1.0",
     "@types/jest": "30.0.0",
     "@types/node": "22.20.5",
+    "husky": "9.1.7",
     "rxjs": "7.8.2",
     "tsup": "8.5.1",
     "tsx": "4.23.15",

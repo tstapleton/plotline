@@ -9,7 +9,9 @@ describe('diffState', () => {
   it('diffs lists of entities item by item', () => {
     const a = { id: 'a', title: 'A', favorite: false };
     const b = { id: 'b', title: 'B', favorite: false };
-    assert.deepEqual(lines({ recipes: [a, b] }, { recipes: [{ ...a, favorite: true }, b] }), ['recipes[a].favorite: false → true']);
+    assert.deepEqual(lines({ recipes: [a, b] }, { recipes: [{ ...a, favorite: true }, b] }), [
+      'recipes[a].favorite: false → true',
+    ]);
     assert.deepEqual(lines({ recipes: [a, b] }, { recipes: [a] }), ['recipes[b]: removed']);
     assert.deepEqual(lines({ recipes: [a] }, { recipes: [a, b] }), ['recipes[b]: {id: "b", …}']);
   });
@@ -25,9 +27,9 @@ describe('summarize', () => {
   });
 });
 
-describe('escape', () => {
+describe('escapeText', () => {
   it('keeps typed newlines from breaking a Mermaid message', async () => {
-    const { escape } = await import('../src/core/mermaid');
-    assert.equal(escape('2 eggs\n300 ml milk; #1'), '2 eggs ⏎ 300 ml milk#59; #35;1');
+    const { escapeText } = await import('../src/core/mermaid');
+    assert.equal(escapeText('2 eggs\n300 ml milk; #1'), '2 eggs ⏎ 300 ml milk#59; #35;1');
   });
 });

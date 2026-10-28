@@ -1,10 +1,10 @@
 import { toSequenceDiagram } from '../core/mermaid';
 import { html, page, slug, svgOf } from '../report/page';
-import { TestDiff } from './align';
-import { DiffLabels } from './markdown';
-import { DIFF_MARKS, toDiffDiagram } from './mermaid';
+import { latestTrace, type TestDiff } from './align';
 import { describeTest, groupChanges } from './describe';
-import { Unstable } from './stability';
+import type { DiffLabels } from './markdown';
+import { DIFF_MARKS, toDiffDiagram } from './mermaid';
+import type { Unstable } from './stability';
 import { countsText, reviewOrder, statusLabel, summarizeRun } from './summary';
 
 /** The full review page: every changed test's diff, plus before and after diagrams. */
@@ -17,7 +17,10 @@ export function diffPage(diffs: TestDiff[], labels: DiffLabels, unstable: Unstab
     .map((s) => `<span class="badge ${badgeClass(s)}">${summary.byStatus[s]} ${s}</span>`)
     .join('');
   const toc = ordered
-    .map((d) => `<li><span class="badge ${badgeClass(d.status)}">${statusLabel(d)}</span><a href="#${slug(d.test)}">${html(d.test)}</a> <span class="counts">${html(countsText(d))}</span></li>`)
+    .map(
+      (d) =>
+        `<li><span class="badge ${badgeClass(d.status)}">${statusLabel(d)}</span><a href="#${slug(d.test)}">${html(d.test)}</a> <span class="counts">${html(countsText(d))}</span></li>`,
+    )
     .join('\n');
 
   return page(
@@ -52,12 +55,11 @@ function section(d: TestDiff): string {
 
   if (d.status === 'unchanged') {
     return `<section class="test" id="${slug(d.test)}">${head}
-  <details><summary>Diagram</summary><div class="diagram">${svgOf(toSequenceDiagram(d.head!))}</div></details>
+  <details><summary>Diagram</summary><div class="diagram">${svgOf(toSequenceDiagram(d.head))}</div></details>
 </section>`;
   }
   if (d.status !== 'changed') {
-    const trace = (d.head ?? d.base)!;
-    return `<section class="test" id="${slug(d.test)}">${head}<div class="diagram">${svgOf(toSequenceDiagram(trace))}</div></section>`;
+    return `<section class="test" id="${slug(d.test)}">${head}<div class="diagram">${svgOf(toSequenceDiagram(latestTrace(d)))}</div></section>`;
   }
 
   const lines = describeTest(d)
@@ -68,8 +70,8 @@ function section(d: TestDiff): string {
   <div class="diagram">${svgOf(toDiffDiagram(d))}</div>
   <details><summary>Before and after</summary>
     <div class="sides">
-      <div><h3>Before</h3><div class="diagram">${svgOf(toSequenceDiagram(d.base!))}</div></div>
-      <div><h3>After</h3><div class="diagram">${svgOf(toSequenceDiagram(d.head!))}</div></div>
+      <div><h3>Before</h3><div class="diagram">${svgOf(toSequenceDiagram(d.base))}</div></div>
+      <div><h3>After</h3><div class="diagram">${svgOf(toSequenceDiagram(d.head))}</div></div>
     </div>
   </details>
 </section>`;
@@ -77,7 +79,9 @@ function section(d: TestDiff): string {
 
 function unstableWarning(unstable: Unstable[]): string {
   if (!unstable.length) return '';
-  const items = unstable.map((u) => `<li><a href="#${slug(u.test)}">${html(u.test)}</a>: ${inline(u.example)}</li>`).join('');
+  const items = unstable
+    .map((u) => `<li><a href="#${slug(u.test)}">${html(u.test)}</a>: ${inline(u.example)}</li>`)
+    .join('');
   return `<section class="summary unstable"><h2>Recorded differently on two runs</h2>
   <p>These tests changed between two runs of the same code, so their diffs may show changes this PR didn't make. The usual causes are random ids, real timestamps or async work the test doesn't wait for.</p>
   <ul class="changes">${items}</ul></section>`;

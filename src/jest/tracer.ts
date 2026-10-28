@@ -1,9 +1,9 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { isSignal } from '@angular/core';
 import { SIGNAL } from '@angular/core/primitives/signals';
-import { getState, StateSource, watchState } from '@ngrx/signals';
-import { AsyncLocalStorage } from 'node:async_hooks';
-import { TraceSink } from '../store/with-tracing';
-import { Participant, TraceEvent } from '../core/model';
+import { getState, type StateSource, watchState } from '@ngrx/signals';
+import type { Participant, TraceEvent } from '../core/model';
+import type { TraceSink } from '../store/with-tracing';
 import { classesOnStack, outputSource, renderedComponents } from './components';
 import { baseObservable, isObservable } from './observable';
 import { diffState, summarize, summarizeArgs } from './summarize';
@@ -108,7 +108,12 @@ export class Tracer implements TraceSink {
     if (!source || source.child === source.parent) return;
     this.addComponent(source.child);
     this.addComponent(source.parent);
-    this.record({ kind: 'call', from: source.child, to: source.parent, label: `${source.output}(${value === undefined ? '' : summarize(value)})` });
+    this.record({
+      kind: 'call',
+      from: source.child,
+      to: source.parent,
+      label: `${source.output}(${value === undefined ? '' : summarize(value)})`,
+    });
   }
 
   /** Registers a component as a participant, in the same box as the UI. */
@@ -141,7 +146,8 @@ export class Tracer implements TraceSink {
         const value = Reflect.get(obj, key, receiver);
         if (typeof value !== 'function' || typeof key !== 'string') return value;
         if (options.methods && !options.methods.includes(key)) return value;
-        if (!cache.has(key)) cache.set(key, this.wrapFunction(name, key, value as (...args: unknown[]) => unknown, obj));
+        if (!cache.has(key))
+          cache.set(key, this.wrapFunction(name, key, value as (...args: unknown[]) => unknown, obj));
         return cache.get(key);
       },
     });
@@ -166,7 +172,7 @@ export class Tracer implements TraceSink {
     // Run their computation as the store so the calls they make are attributed to it.
     // This patches Angular's signal node, so only computeds exposed on the store are covered.
     for (const value of Object.values(inner.props)) {
-      const node = isSignal(value) ? ((value as unknown as Record<symbol, ComputedNode>)[SIGNAL]) : undefined;
+      const node = isSignal(value) ? (value as unknown as Record<symbol, ComputedNode>)[SIGNAL] : undefined;
       const computation = node?.computation;
       if (node && computation) node.computation = (previous) => this.runAs(name, () => computation(previous));
     }
@@ -280,4 +286,4 @@ function isRxMethodRef(value: unknown): boolean {
 export const tracer = new Tracer();
 
 /** Set PLOTLINE=1 to record. */
-export const tracingEnabled = !!process.env['PLOTLINE'];
+export const tracingEnabled = !!process.env.PLOTLINE;

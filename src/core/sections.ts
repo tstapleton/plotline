@@ -11,7 +11,7 @@ export function splitSections<T>(items: T[], isUserAction: (item: T) => boolean)
   const sections: Section<T>[] = [{ number: 0, items: [] }];
   for (const item of items) {
     if (isUserAction(item)) sections.push({ number: sections.length, items: [item] });
-    else sections[sections.length - 1]!.items.push(item);
+    else sections[sections.length - 1].items.push(item);
   }
   return sections.filter((s) => s.items.length);
 }

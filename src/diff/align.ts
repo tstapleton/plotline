@@ -1,5 +1,5 @@
 import { mergeRepeatedGestures, shape } from '../core/merge';
-import { describeChange, TraceEvent, TraceFile, traceKey } from '../core/model';
+import { describeChange, type TraceEvent, type TraceFile, traceKey } from '../core/model';
 
 export type DiffOp =
   | { op: 'same'; event: TraceEvent }
@@ -12,18 +12,28 @@ export type DiffOp =
 
 export type TestStatus = 'added' | 'removed' | 'changed' | 'unchanged';
 
-export interface TestDiff {
+/** Which runs recorded the test follows from its status. */
+export type TestDiff = TestDiffFields & TestSides;
+
+type TestSides =
+  | { status: 'added'; base?: undefined; head: TraceFile }
+  | { status: 'removed'; base: TraceFile; head?: undefined }
+  | { status: 'changed' | 'unchanged'; base: TraceFile; head: TraceFile };
+
+interface TestDiffFields {
   key: string;
   spec: string;
   test: string;
-  status: TestStatus;
   /** Set when a test with a different name in the base run had mostly the same steps. */
   renamedFrom?: string;
-  base?: TraceFile;
-  head?: TraceFile;
   ops: DiffOp[];
   counts: { added: number; removed: number; changed: number; moved: number };
   participants: { added: string[]; removed: string[] };
+}
+
+/** The test's latest recording: from the head run, or the base run if it was removed. */
+export function latestTrace(d: TestSides): TraceFile {
+  return d.status === 'removed' ? d.base : d.head;
 }
 
 /**
@@ -65,22 +75,31 @@ function similarity(a: TraceFile, b: TraceFile): number {
 }
 
 export function diffTest(base: TraceFile | undefined, head: TraceFile | undefined): TestDiff {
-  const either = (head ?? base)!;
-  const ops = diffEvents(base ? mergeRepeatedGestures(base.events) : [], head ? mergeRepeatedGestures(head.events) : []);
+  const ops = diffEvents(
+    base ? mergeRepeatedGestures(base.events) : [],
+    head ? mergeRepeatedGestures(head.events) : [],
+  );
   const counts = { added: 0, removed: 0, changed: 0, moved: 0 };
   for (const o of ops) if (o.op !== 'same') counts[o.op]++;
 
   const before = new Set(base ? namesIn(base) : []);
   const after = new Set(head ? namesIn(head) : []);
-  const status: TestStatus = !base ? 'added' : !head ? 'removed' : ops.every((o) => o.op === 'same') ? 'unchanged' : 'changed';
+  const sides: TestSides | undefined =
+    base && head
+      ? { status: ops.every((o) => o.op === 'same') ? 'unchanged' : 'changed', base, head }
+      : head
+        ? { status: 'added', head }
+        : base
+          ? { status: 'removed', base }
+          : undefined;
+  if (!sides) throw new Error('diffTest needs a base or a head trace');
+  const latest = latestTrace(sides);
 
   return {
-    key: traceKey(either),
-    spec: either.spec,
-    test: either.test,
-    status,
-    base,
-    head,
+    key: traceKey(latest),
+    spec: latest.spec,
+    test: latest.test,
+    ...sides,
     ops,
     counts,
     participants: {
@@ -102,8 +121,7 @@ export function diffEvents(base: TraceEvent[], head: TraceEvent[]): DiffOp[] {
   const headShapes = head.map(shape);
   const baseText = base.map(textOf);
   const headText = head.map(textOf);
-  const score = (i: number, j: number) =>
-    baseShapes[i] !== headShapes[j] ? 0 : baseText[i] === headText[j] ? 2 : 1;
+  const score = (i: number, j: number) => (baseShapes[i] !== headShapes[j] ? 0 : baseText[i] === headText[j] ? 2 : 1);
 
   // best[i][j] = best score aligning base[i..] with head[j..]
   const best = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
@@ -114,7 +132,7 @@ export function diffEvents(base: TraceEvent[], head: TraceEvent[]): DiffOp[] {
     }
   }
 
-  let ops: DiffOp[] = [];
+  const ops: DiffOp[] = [];
   let i = 0;
   let j = 0;
   while (i < n || j < m) {
@@ -137,13 +155,19 @@ export function diffEvents(base: TraceEvent[], head: TraceEvent[]): DiffOp[] {
  * user gesture in between, is one message that moved: keep it once, where it is now.
  */
 function detectMoves(ops: DiffOp[]): DiffOp[] {
-  const gesture = (index: number) => ops.slice(0, index).filter((o) => o.op === 'same' && o.event.kind === 'user').length;
+  const gesture = (index: number) =>
+    ops.slice(0, index).filter((o) => o.op === 'same' && o.event.kind === 'user').length;
   const dropped = new Set<number>();
   const result = [...ops];
   ops.forEach((o, i) => {
     if (o.op !== 'added') return;
     const match = ops.findIndex(
-      (r, j) => r.op === 'removed' && !dropped.has(j) && shape(r.event) === shape(o.event) && textOf(r.event) === textOf(o.event) && gesture(j) === gesture(i),
+      (r, j) =>
+        r.op === 'removed' &&
+        !dropped.has(j) &&
+        shape(r.event) === shape(o.event) &&
+        textOf(r.event) === textOf(o.event) &&
+        gesture(j) === gesture(i),
     );
     if (match < 0) return;
     dropped.add(match);

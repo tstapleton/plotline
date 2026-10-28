@@ -1,5 +1,5 @@
 import { owningComponent } from './components';
-import { Tracer } from './tracer';
+import type { Tracer } from './tracer';
 
 /**
  * Turns DOM events fired by Testing Library / user-event into "User → UI" messages.
@@ -18,22 +18,38 @@ export function recordUserEvents(tracer: Tracer, root: Document = document): () 
   const onInput = (event: Event) => {
     const el = event.target;
     if ((el instanceof HTMLInputElement && !isToggle(el)) || el instanceof HTMLTextAreaElement) {
-      tracer.record({ kind: 'user', to: target(el), key: `type:${elementKey(el)}`, text: `types ${quote(el.value)} into ${quote(labelOf(el))}` });
+      tracer.record({
+        kind: 'user',
+        to: target(el),
+        key: `type:${elementKey(el)}`,
+        text: `types ${quote(el.value)} into ${quote(labelOf(el))}`,
+      });
     }
   };
   const onChange = (event: Event) => {
     const el = event.target;
     if (el instanceof HTMLSelectElement) {
       const text = el.selectedOptions[0]?.textContent?.trim() ?? el.value;
-      tracer.record({ kind: 'user', to: target(el), key: `select:${elementKey(el)}`, text: `selects ${quote(text)} in ${quote(labelOf(el))}` });
+      tracer.record({
+        kind: 'user',
+        to: target(el),
+        key: `select:${elementKey(el)}`,
+        text: `selects ${quote(text)} in ${quote(labelOf(el))}`,
+      });
     } else if (el instanceof HTMLInputElement && isToggle(el)) {
-      tracer.record({ kind: 'user', to: target(el), key: `toggle:${elementKey(el)}`, text: `${el.checked ? 'checks' : 'unchecks'} ${quote(labelOf(el))}` });
+      tracer.record({
+        kind: 'user',
+        to: target(el),
+        key: `toggle:${elementKey(el)}`,
+        text: `${el.checked ? 'checks' : 'unchecks'} ${quote(labelOf(el))}`,
+      });
     }
   };
   const onClick = (event: Event) => {
     const el = (event.target as Element | null)?.closest('button, a, [role="button"]');
     if (el) {
-      const name = el.getAttribute('aria-label') || el.textContent?.trim().replace(/\s+/g, ' ') || el.tagName.toLowerCase();
+      const name =
+        el.getAttribute('aria-label') || el.textContent?.trim().replace(/\s+/g, ' ') || el.tagName.toLowerCase();
       tracer.record({ kind: 'user', to: target(el), key: `click:${el.id || name}`, text: `clicks ${quote(name)}` });
     }
   };
@@ -64,5 +80,5 @@ function elementKey(el: Element): string {
 }
 
 function quote(text: string): string {
-  return `"${text.length > 40 ? text.slice(0, 39) + '…' : text}"`;
+  return `"${text.length > 40 ? `${text.slice(0, 39)}…` : text}"`;
 }
