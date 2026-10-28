@@ -11,7 +11,7 @@ export interface TraceSink {
 
 // Keyed globally so the ESM build (used by the app) and the CommonJS build (used by
 // Jest) share one token even when both end up loaded.
-const TOKEN_KEY = Symbol.for('@tstapleton/plotline/TRACE_SINK');
+const TOKEN_KEY = Symbol.for('@tsociety/plotline/TRACE_SINK');
 const registry = globalThis as unknown as Record<symbol, InjectionToken<TraceSink> | undefined>;
 
 registry[TOKEN_KEY] ??= new InjectionToken<TraceSink>('TRACE_SINK');
