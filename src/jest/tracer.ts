@@ -189,15 +189,16 @@ export class Tracer implements TraceSink {
     thisArg: unknown,
   ): (...args: unknown[]) => unknown {
     const tracer = this;
-    const wrapped = function (...args: unknown[]) {
+    const wrapped = function (this: unknown, ...args: unknown[]) {
+      const receiver = thisArg === undefined ? this : thisArg;
       const from = tracer.callerOrComponent();
       // Calls inside a participant stay off the diagram; it shows boundaries only.
-      if (from === name) return fn.apply(thisArg, args);
+      if (from === name) return fn.apply(receiver, args);
 
       tracer.record({ kind: 'call', from, to: name, label: `${method}(${summarizeArgs(args)})` });
       let result: unknown;
       try {
-        result = tracer.runAs(name, () => fn.apply(thisArg, args));
+        result = tracer.runAs(name, () => fn.apply(receiver, args));
       } catch (error) {
         tracer.record({ kind: 'throw', from: name, to: from, label: summarize(error) });
         throw error;
