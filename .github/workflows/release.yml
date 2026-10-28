@@ -1,6 +1,6 @@
 name: Release
 
-# Every merge to main publishes the next patch version to GitHub Packages, tags it
+# Every merge to main publishes the next patch version to npm, tags it
 # vX.Y.Z, and moves the v0 tag that workflows use (tstapleton/plotline@v0).
 on:
   push:
@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: write # push tags
-      packages: write # publish to npm.pkg.github.com
+      id-token: write # npm trusted publishing
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -29,8 +29,7 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-          registry-url: https://npm.pkg.github.com
-          scope: '@tstapleton'
+          registry-url: https://registry.npmjs.org
       - run: npm ci --no-audit --no-fund
 
       - name: Pick the next version
@@ -49,7 +48,6 @@ jobs:
 
       - name: Publish
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.version.outputs.next }}
         run: |
           npm version "$VERSION" --no-git-tag-version

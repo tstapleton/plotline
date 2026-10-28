@@ -13,29 +13,19 @@ See it on the pull requests of [tstapleton/birdseed](https://github.com/tstaplet
 
 ## Install
 
-The package is on GitHub Packages, which needs a token even for public packages. In the
-app's `.npmrc`:
-
 ```
-@tstapleton:registry=https://npm.pkg.github.com
+npm install @tsociety/plotline
 ```
 
-and locally, a [personal access token](https://github.com/settings/tokens) with
-`read:packages` in your user `~/.npmrc`:
-
-```
-//npm.pkg.github.com/:_authToken=YOUR_TOKEN
-```
-
-Then `npm install @tstapleton/plotline`. It's a regular dependency, not a dev one,
-because stores import `withTracing` from it. In the app that import does nothing.
+It's a regular dependency, not a dev one, because stores import `withTracing` from it.
+In the app that import does nothing.
 
 ## Set up
 
 Mark each store, after the features to trace and before `withHooks`:
 
 ```ts
-import { withTracing } from '@tstapleton/plotline/store';
+import { withTracing } from '@tsociety/plotline/store';
 
 export const RecipesStore = signalStore(
   withState(initialState),
@@ -55,7 +45,7 @@ In that helper, name the services that should appear in the diagrams. Your mocks
 as they are; only the provider is wrapped:
 
 ```ts
-import { provideTracing, recordPlotline, traced } from '@tstapleton/plotline/jest';
+import { provideTracing, recordPlotline, traced } from '@tsociety/plotline/jest';
 
 recordPlotline(); // records the spec files that import this helper
 
@@ -103,21 +93,16 @@ on:
 
 permissions:
   contents: read
-  packages: read
   pull-requests: write
 
 jobs:
   behaviour-diff:
     runs-on: ubuntu-latest
-    env:
-      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          registry-url: https://npm.pkg.github.com
-          scope: '@tstapleton'
       - uses: tstapleton/plotline@v0
 ```
 

@@ -1,5 +1,5 @@
 {
-  "name": "@tstapleton/plotline",
+  "name": "@tsociety/plotline",
   "version": "0.0.0",
   "description": "Sequence diagrams of Angular + NgRx SignalStore features, recorded from integration tests and diffed on pull requests.",
   "license": "MIT",
@@ -29,7 +29,7 @@
     "dist"
   ],
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+    "access": "public"
   },
   "scripts": {
     "build": "tsup",
@@ -56,5 +56,9 @@
     "tsup": "8.5.1",
     "tsx": "4.23.15",
     "typescript": "5.9.3"
+  },
+  "allowScripts": {
+    "esbuild": false,
+    "fsevents": false
   }
 }
