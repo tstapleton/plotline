@@ -35,7 +35,11 @@ function main(argv: string[]): number {
   if (command === 'diff' && positional.length === 2) {
     const [baseDir, headDir] = positional;
     const out = resolve(flag('out') ?? 'trace-diff');
-    const labels = { base: flag('base-label') ?? baseDir, head: flag('head-label') ?? headDir, reportUrl: flag('report-url') };
+    const labels = {
+      base: flag('base-label') ?? baseDir,
+      head: flag('head-label') ?? headDir,
+      reportUrl: flag('report-url'),
+    };
     const head = loadTraces(resolve(headDir));
     const diffs = diffRuns(loadTraces(resolve(baseDir)), head);
     const again = flag('again');
@@ -44,15 +48,21 @@ function main(argv: string[]): number {
     writeFileSync(join(out, 'comment.md'), diffComment(diffs, labels, unstable));
     writeFileSync(join(out, 'index.html'), diffPage(diffs, labels, unstable));
     const changed = diffs.filter((d) => d.status !== 'unchanged').length;
-    console.log(`${changed} of ${diffs.length} tests changed. Wrote ${join(out, 'comment.md')} and ${join(out, 'index.html')}`);
+    console.log(
+      `${changed} of ${diffs.length} tests changed. Wrote ${join(out, 'comment.md')} and ${join(out, 'index.html')}`,
+    );
     if (unstable.length) console.log(`${unstable.length} tests recorded differently on two runs of the same code.`);
     return 0;
   }
 
   if (command === 'stable' && positional.length === 2) {
-    const unstable = findUnstable(loadTraces(resolve(positional[0]!)), loadTraces(resolve(positional[1]!)));
+    const unstable = findUnstable(loadTraces(resolve(positional[0])), loadTraces(resolve(positional[1])));
     for (const u of unstable) console.log(`✗ ${u.key}\n    ${u.example.replace(/\*\*/g, '')}`);
-    console.log(unstable.length ? `${unstable.length} tests recorded differently on two runs.` : 'Every test recorded the same on both runs.');
+    console.log(
+      unstable.length
+        ? `${unstable.length} tests recorded differently on two runs.`
+        : 'Every test recorded the same on both runs.',
+    );
     return unstable.length ? 1 : 0;
   }
 

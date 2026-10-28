@@ -22,8 +22,5 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci --no-audit --no-fund
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run build
-      - name: Check the package contents
-        run: npm pack --dry-run
+      - run: npm run verify
+      - run: npm audit

@@ -1,5 +1,5 @@
 import { isSignal } from '@angular/core';
-import { StateChange } from '../core/model';
+import type { StateChange } from '../core/model';
 import { isObservable } from './observable';
 
 /** One-line, size-capped description of a value for a diagram label. */
@@ -86,7 +86,11 @@ function diffEntities(key: string, before: Entity[], after: Entity[]): StateChan
 }
 
 function isEntityList(value: unknown): value is Entity[] {
-  return Array.isArray(value) && value.length > 0 && value.every((v) => isRecord(v) && (typeof v['id'] === 'string' || typeof v['id'] === 'number'));
+  return (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.every((v) => isRecord(v) && (typeof v.id === 'string' || typeof v.id === 'number'))
+  );
 }
 
 function toChange(path: string, before: unknown, after: unknown): StateChange {
@@ -107,7 +111,12 @@ function isScalar(value: unknown): boolean {
 
 /** Angular's HttpErrorResponse and look-alikes, which aren't Error instances. */
 function isHttpError(value: unknown): value is { status: number } {
-  return typeof value === 'object' && value !== null && typeof (value as { status?: unknown }).status === 'number' && 'statusText' in value;
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as { status?: unknown }).status === 'number' &&
+    'statusText' in value
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

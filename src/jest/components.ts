@@ -39,7 +39,9 @@ export function outputSource(emitter: object): OutputSource | undefined {
 
 function ng(): NgDebug | undefined {
   const candidate = (globalThis as { ng?: Partial<NgDebug> }).ng;
-  return typeof candidate?.getComponent === 'function' && typeof candidate.getOwningComponent === 'function' ? (candidate as NgDebug) : undefined;
+  return typeof candidate?.getComponent === 'function' && typeof candidate.getOwningComponent === 'function'
+    ? (candidate as NgDebug)
+    : undefined;
 }
 
 /** The component whose template contains `element`. */

@@ -1,5 +1,5 @@
-import { describeChange, TraceEvent } from '../core/model';
-import { DiffOp, TestDiff, textOf } from './align';
+import { describeChange, type TraceEvent } from '../core/model';
+import { type DiffOp, type TestDiff, textOf } from './align';
 
 /**
  * One behaviour change as a sentence. `text` is Markdown: participants in **bold**,
@@ -71,7 +71,8 @@ export function groupChanges(diffs: TestDiff[]): ChangeGroup[] {
         continue;
       }
       // Tests that differ in the details share the sentence without them.
-      if (group.change.text !== change.text) group.change = { ...group.change, text: group.change.generic.replace(/ \(\d+ times\)$/, '') };
+      if (group.change.text !== change.text)
+        group.change = { ...group.change, text: group.change.generic.replace(/ \(\d+ times\)$/, '') };
       if (!group.tests.includes(diff)) group.tests.push(diff);
     }
   }
@@ -133,7 +134,9 @@ function sentence(op: Change['op'], e: TraceEvent, was: TraceEvent | undefined):
       return {
         added: `**${e.from}** now answers **${e.to}** with ${code(e.label)}`,
         removed: `**${e.from}** no longer answers **${e.to}** with ${code(e.label)}`,
-        changed: was ? `**${e.from}** answers **${e.to}** with ${code(e.label)} instead of ${code(textOf(was))}` : `**${e.from}** answers **${e.to}** differently`,
+        changed: was
+          ? `**${e.from}** answers **${e.to}** with ${code(e.label)} instead of ${code(textOf(was))}`
+          : `**${e.from}** answers **${e.to}** differently`,
         moved: `**${e.from}** answers **${e.to}** at a different point`,
       }[op];
 
@@ -141,7 +144,9 @@ function sentence(op: Change['op'], e: TraceEvent, was: TraceEvent | undefined):
       return {
         added: `**${e.from}** now fails with ${code(e.label)}`,
         removed: `**${e.from}** no longer fails with ${code(e.label)}`,
-        changed: was ? `**${e.from}** fails with ${code(e.label)} instead of ${code(textOf(was))}` : `**${e.from}** fails differently`,
+        changed: was
+          ? `**${e.from}** fails with ${code(e.label)} instead of ${code(textOf(was))}`
+          : `**${e.from}** fails differently`,
         moved: `**${e.from}** fails at a different point`,
       }[op];
 
@@ -153,7 +158,7 @@ function sentence(op: Change['op'], e: TraceEvent, was: TraceEvent | undefined):
       if (op === 'changed' && was?.kind === 'note') {
         const before = new Map(was.changes.map((c) => [c.path, describeChange(c)]));
         const differing = e.changes.filter((c) => before.get(c.path) !== describeChange(c));
-        const first = differing[0] ?? e.changes[0]!;
+        const first = differing[0] ?? e.changes[0];
         const old = before.get(first.path);
         return `**${e.over}** state: ${code(describeChange(first))}${old ? ` instead of ${code(old)}` : ''}`;
       }
@@ -175,15 +180,15 @@ function withoutData(e: Extract<TraceEvent, { kind: 'call' | 'return' | 'throw' 
 
 /** Top-level state keys a note touches: `values.title` and `values.tags` are `values`. */
 function stateKeys(e: Extract<TraceEvent, { kind: 'note' }>): string[] {
-  return [...new Set(e.changes.map((c) => c.path.split(/[.[]/)[0]!))];
+  return [...new Set(e.changes.map((c) => c.path.split(/[.[]/)[0]))];
 }
 
 function method(label: string): string {
-  return label.split('(')[0]!;
+  return label.split('(')[0];
 }
 
 /** Inline code that survives backticks in the value. */
 function code(text: string): string {
   const clipped = text.length > 80 ? `${text.slice(0, 79)}…` : text;
-  return '`' + clipped.replace(/`/g, "'").replace(/\n/g, ' ⏎ ') + '`';
+  return `\`${clipped.replace(/`/g, "'").replace(/\n/g, ' ⏎ ')}\``;
 }

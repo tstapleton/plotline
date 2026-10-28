@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { TraceFile } from '../core/model';
+import type { TraceFile } from '../core/model';
 
 /** Reads every `*.json` trace under a directory written by `npm run test:trace`. */
 export function loadTraces(dir: string): TraceFile[] {

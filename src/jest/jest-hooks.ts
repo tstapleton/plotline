@@ -1,14 +1,14 @@
-import { ApplicationRef, OutputEmitterRef } from '@angular/core';
-import { ComponentFixture } from '@angular/core/testing';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { basename, join, relative, resolve } from 'node:path';
-import { recordUserEvents } from './dom-recorder';
+import { ApplicationRef, OutputEmitterRef } from '@angular/core';
+import { ComponentFixture } from '@angular/core/testing';
 import { toSequenceDiagram } from '../core/mermaid';
-import { TraceFile } from '../core/model';
+import type { TraceFile } from '../core/model';
+import { recordUserEvents } from './dom-recorder';
 import { tracer, tracingEnabled } from './tracer';
 
 /** Where traces go; set PLOTLINE_DIR to keep two runs apart (e.g. base and PR). */
-export const OUTPUT_DIR = resolve(process.cwd(), process.env['PLOTLINE_DIR'] ?? 'plotline');
+export const OUTPUT_DIR = resolve(process.cwd(), process.env.PLOTLINE_DIR ?? 'plotline');
 
 // Module state is per test file, because Jest gives each file its own module registry.
 let registered = false;
@@ -54,12 +54,28 @@ export function recordPlotline(): void {
     const spec = basename(testPath).replace(/\.spec\.ts$/, '');
     const dir = join(OUTPUT_DIR, spec);
     mkdirSync(dir, { recursive: true });
-    const trace: TraceFile = { version: 1, spec: relative(process.cwd(), testPath), test: currentTestName, ui: tracer.uiName, participants: tracer.participants, events };
+    const trace: TraceFile = {
+      version: 1,
+      spec: relative(process.cwd(), testPath),
+      test: currentTestName,
+      ui: tracer.uiName,
+      participants: tracer.participants,
+      events,
+    };
     const file = join(dir, slug(currentTestName));
-    writeFileSync(`${file}.json`, JSON.stringify(trace, null, 2) + '\n');
+    writeFileSync(`${file}.json`, `${JSON.stringify(trace, null, 2)}\n`);
     writeFileSync(
       `${file}.md`,
-      [`# ${currentTestName}`, '', `Generated from \`${trace.spec}\` by plotline.`, '', '```mermaid', toSequenceDiagram(trace), '```', ''].join('\n'),
+      [
+        `# ${currentTestName}`,
+        '',
+        `Generated from \`${trace.spec}\` by plotline.`,
+        '',
+        '```mermaid',
+        toSequenceDiagram(trace),
+        '```',
+        '',
+      ].join('\n'),
     );
   });
 }
@@ -73,11 +89,11 @@ function attributeChangeDetectionToUi(): () => void {
   const appRef = ApplicationRef.prototype as unknown as Record<string, (...args: unknown[]) => unknown>;
   const fixture = ComponentFixture.prototype as unknown as Record<string, (...args: unknown[]) => unknown>;
   const targets: [Record<string, (...args: unknown[]) => unknown>, string][] = [
-    [appRef, typeof appRef['_tick'] === 'function' ? '_tick' : 'tick'],
+    [appRef, typeof appRef._tick === 'function' ? '_tick' : 'tick'],
     [fixture, 'detectChanges'],
   ];
   const originals = targets.map(([target, name]) => {
-    const original = target[name]!;
+    const original = target[name];
     target[name] = function (this: unknown, ...args: unknown[]) {
       const result = tracer.runAs(tracer.uiName, () => original.apply(this, args));
       tracer.observeComponents();
@@ -85,7 +101,9 @@ function attributeChangeDetectionToUi(): () => void {
     };
     return original;
   });
-  return () => targets.forEach(([target, name], i) => (target[name] = originals[i]!));
+  return () => {
+    for (const [i, [target, name]] of targets.entries()) target[name] = originals[i];
+  };
 }
 
 /**
@@ -105,5 +123,8 @@ function recordOutputs(): () => void {
 }
 
 function slug(text: string): string {
-  return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
 }

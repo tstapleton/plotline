@@ -13,7 +13,12 @@ type ObservableConstructor = new (subscribe: (subscriber: Subscriber) => unknown
 
 /** An RxJS Observable (or Subject, or any look-alike), recognised without importing RxJS. */
 export function isObservable(value: unknown): value is ObservableLike {
-  return typeof value === 'object' && value !== null && typeof (value as ObservableLike).subscribe === 'function' && typeof (value as ObservableLike).pipe === 'function';
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as ObservableLike).subscribe === 'function' &&
+    typeof (value as ObservableLike).pipe === 'function'
+  );
 }
 
 /**
@@ -21,7 +26,7 @@ export function isObservable(value: unknown): value is ObservableLike {
  * a Subject yields Observable, whose constructor takes a subscribe function.
  */
 export function baseObservable(value: ObservableLike): ObservableConstructor {
-  let proto = Object.getPrototypeOf(value) as { constructor: ObservableConstructor } | null;
-  while (proto && Object.getPrototypeOf(proto) !== Object.prototype) proto = Object.getPrototypeOf(proto);
-  return proto!.constructor;
+  let proto = Object.getPrototypeOf(value) as { constructor: ObservableConstructor };
+  while (Object.getPrototypeOf(proto) !== Object.prototype) proto = Object.getPrototypeOf(proto);
+  return proto.constructor;
 }
